@@ -25,7 +25,29 @@ def connect_whoop():
 
 @router.get("/status")
 def whoop_status():
-    return {"connected": state.WHOOP["access_token"] is not None}
+    creds = state.WHOOP_CREDS
+    return {
+        "connected":       state.WHOOP["access_token"] is not None,
+        "credentials_set": bool(creds["client_id"] and creds["client_secret"]),
+    }
+
+
+class CredentialsRequest(BaseModel):
+    client_id:     str
+    client_secret: str
+    redirect_uri:  str  # sent by frontend as window.location.origin + '/whoop/callback'
+
+
+@router.post("/credentials")
+def save_credentials(req: CredentialsRequest):
+    """
+    Store Whoop developer app credentials entered via the Profile UI.
+    No restart needed — takes effect immediately.
+    """
+    state.WHOOP_CREDS["client_id"]     = req.client_id.strip()
+    state.WHOOP_CREDS["client_secret"] = req.client_secret.strip()
+    state.WHOOP_CREDS["redirect_uri"]  = req.redirect_uri.strip()
+    return {"status": "saved"}
 
 
 class CallbackRequest(BaseModel):

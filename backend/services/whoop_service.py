@@ -6,25 +6,19 @@ Whoop API reference: https://developer.whoop.com/api
 Apply for API access: https://developer-dashboard.whoop.com
 """
 import httpx
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
+import state
 
 WHOOP_BASE      = "https://api.prod.whoop.com/developer"
 WHOOP_AUTH_URL  = "https://api.prod.whoop.com/oauth/oauth2/auth"
 WHOOP_TOKEN_URL = "https://api.prod.whoop.com/oauth/oauth2/token"
 
-CLIENT_ID     = os.getenv("WHOOP_CLIENT_ID")
-CLIENT_SECRET = os.getenv("WHOOP_CLIENT_SECRET")
-REDIRECT_URI  = os.getenv("WHOOP_REDIRECT_URI")
-
 
 def get_auth_url() -> str:
     """
     Step 1 of OAuth — build the URL to send the user to Whoop's login page.
-    After login, Whoop redirects to REDIRECT_URI with a one-time `code`.
+    After login, Whoop redirects to redirect_uri with a one-time `code`.
     """
+    creds  = state.WHOOP_CREDS
     scopes = " ".join([
         "read:recovery",
         "read:cycles",
@@ -34,8 +28,8 @@ def get_auth_url() -> str:
     ])
     return (
         f"{WHOOP_AUTH_URL}"
-        f"?client_id={CLIENT_ID}"
-        f"&redirect_uri={REDIRECT_URI}"
+        f"?client_id={creds['client_id']}"
+        f"&redirect_uri={creds['redirect_uri']}"
         f"&response_type=code"
         f"&scope={scopes}"
     )
@@ -44,18 +38,18 @@ def get_auth_url() -> str:
 async def exchange_code_for_tokens(code: str) -> dict:
     """
     Step 2 of OAuth — swap the one-time code for access + refresh tokens.
-    Store both tokens in the DB. Access token expires in ~1 hour.
-    Refresh token lasts much longer and is used to get new access tokens.
+    Access token expires in ~1 hour; use the refresh token to renew it.
     """
+    creds = state.WHOOP_CREDS
     async with httpx.AsyncClient() as client:
         response = await client.post(
             WHOOP_TOKEN_URL,
             data={
                 "grant_type":    "authorization_code",
                 "code":          code,
-                "redirect_uri":  REDIRECT_URI,
-                "client_id":     CLIENT_ID,
-                "client_secret": CLIENT_SECRET,
+                "redirect_uri":  creds["redirect_uri"],
+                "client_id":     creds["client_id"],
+                "client_secret": creds["client_secret"],
             }
         )
         response.raise_for_status()
@@ -67,14 +61,15 @@ async def refresh_access_token(refresh_token: str) -> dict:
     When the access token expires, use the refresh token to get a new one.
     Call this automatically when a 401 comes back from Whoop.
     """
+    creds = state.WHOOP_CREDS
     async with httpx.AsyncClient() as client:
         response = await client.post(
             WHOOP_TOKEN_URL,
             data={
                 "grant_type":    "refresh_token",
                 "refresh_token": refresh_token,
-                "client_id":     CLIENT_ID,
-                "client_secret": CLIENT_SECRET,
+                "client_id":     creds["client_id"],
+                "client_secret": creds["client_secret"],
             }
         )
         response.raise_for_status()
@@ -109,8 +104,8 @@ async def get_daily_calories(access_token: str, date: str) -> int | None:
         if not records:
             return None
 
-        cycle     = records[0]
-        score     = cycle.get("score", {})
+        cycle      = records[0]
+        score      = cycle.get("score", {})
         kilojoules = score.get("kilojoule")
 
         if kilojoules is None:
@@ -122,8 +117,6 @@ async def get_daily_calories(access_token: str, date: str) -> int | None:
 async def get_body_measurements(access_token: str) -> dict:
     """
     Pull height, weight, max HR from Whoop.
-    Useful to keep user profile in sync without manual entry.
-
     Returns imperial units (lbs, inches) to match the app's data model.
     """
     headers = {"Authorization": f"Bearer {access_token}"}

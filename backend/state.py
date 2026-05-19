@@ -2,6 +2,16 @@
 In-memory state for the MVP — single user, no database.
 All routers import from here so state is shared across requests.
 """
+import os
+
+# Whoop developer app credentials.
+# Seeded from env vars at startup (Railway/local .env).
+# Can also be set at runtime via POST /whoop/credentials — whichever is set last wins.
+WHOOP_CREDS = {
+    "client_id":     os.getenv("WHOOP_CLIENT_ID"),
+    "client_secret": os.getenv("WHOOP_CLIENT_SECRET"),
+    "redirect_uri":  os.getenv("WHOOP_REDIRECT_URI", "http://localhost:5173/whoop/callback"),
+}
 
 MEALS = [
     {"id": 1, "name": "Egg & Oat Power Bowl",    "calories": 680,  "meal_time": "breakfast", "state": "done"},
