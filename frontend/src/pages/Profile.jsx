@@ -11,6 +11,7 @@ export default function Profile() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [connected, setConnected]       = useState(false)
   const [connecting, setConnecting]     = useState(false)
+  const [connectError, setConnectError] = useState(null)
   const { breakdown, whoopConnected }   = useCalories()
 
   // Check Whoop status on mount and read ?whoop=connected from redirect
@@ -35,11 +36,17 @@ export default function Profile() {
 
   async function handleConnectWhoop() {
     setConnecting(true)
+    setConnectError(null)
     try {
-      const res  = await fetch(`${API}/whoop/connect`)
+      const res = await fetch(`${API}/whoop/connect`)
+      if (!res.ok) throw new Error(`Backend returned ${res.status}`)
       const data = await res.json()
+      if (!data.auth_url) throw new Error('Backend did not return an auth_url')
+      console.log('[Whoop] redirecting to:', data.auth_url)
       window.location.href = data.auth_url
-    } catch {
+    } catch (err) {
+      console.error('[Whoop] connect failed:', err)
+      setConnectError(`${err.message} — API: ${API}`)
       setConnecting(false)
     }
   }
@@ -113,15 +120,20 @@ export default function Profile() {
               {whoopConnected ? '' : ' Wear your Whoop today for live data.'}
             </p>
           : (
-            <button
-              onClick={handleConnectWhoop}
-              disabled={connecting}
-              className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-500
-                         disabled:opacity-50 text-white text-sm font-semibold
-                         transition-colors"
-            >
-              {connecting ? 'Redirecting to Whoop...' : 'Connect Whoop'}
-            </button>
+            <>
+              <button
+                onClick={handleConnectWhoop}
+                disabled={connecting}
+                className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-500
+                           disabled:opacity-50 text-white text-sm font-semibold
+                           transition-colors"
+              >
+                {connecting ? 'Redirecting to Whoop...' : 'Connect Whoop'}
+              </button>
+              {connectError && (
+                <p className="mt-3 text-xs text-red-400 break-all">{connectError}</p>
+              )}
+            </>
           )
         }
       </div>
