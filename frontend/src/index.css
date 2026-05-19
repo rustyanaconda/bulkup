@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Design tokens — match what we built in the prototypes */
+:root {
+  --bg:      #0D1A12;
+  --surface: #152A1E;
+  --border:  #1E3A2A;
+  --green:   #2ECC71;
+  --red:     #E74C3C;
+  --orange:  #F5A623;
+  --text:    #E8F5ED;
+  --muted:   #5C8C6E;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
