@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link }                from 'react-router-dom'
 import { useCalories }         from '../hooks/useCalories'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -211,6 +212,12 @@ export default function Profile() {
             {!whoopConnected && ' Wear your Whoop today for live data.'}
           </p>
         )}
+      </div>
+
+      <div className="mt-8 text-center">
+        <Link to="/privacy" className="text-xs text-[#3A5C48] hover:text-[#5C8C6E] transition-colors">
+          Privacy Policy
+        </Link>
       </div>
     </div>
   )

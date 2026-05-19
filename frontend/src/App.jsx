@@ -5,6 +5,7 @@ import Progress      from './pages/Progress'
 import Shop          from './pages/Shop'
 import Profile       from './pages/Profile'
 import WhoopCallback from './pages/WhoopCallback'
+import Privacy       from './pages/Privacy'
 import BottomNav     from './components/BottomNav'
 
 /**
@@ -16,8 +17,9 @@ import BottomNav     from './components/BottomNav'
 export default function App() {
   return (
     <Routes>
-      {/* OAuth callback — no nav bar, full-screen */}
+      {/* Standalone pages — no nav bar */}
       <Route path="/whoop/callback" element={<WhoopCallback />} />
+      <Route path="/privacy"        element={<Privacy />} />
 
       {/* Main app shell — all routes share the BottomNav */}
       <Route path="*" element={
