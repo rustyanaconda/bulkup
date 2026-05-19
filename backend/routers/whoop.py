@@ -1,10 +1,15 @@
 """
 Whoop OAuth endpoints.
 The frontend hits these to connect/disconnect a Whoop device.
+
+OAuth flow:
+  1. GET  /whoop/connect          → returns Whoop login URL
+  2. User logs in on Whoop; Whoop redirects to FRONTEND /whoop/callback?code=XXX
+  3. Frontend reads ?code= and POSTs it here:
+  4. POST /whoop/callback          → exchanges code for tokens, stores in memory
 """
-import os
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
 from services.whoop_service import get_auth_url, exchange_code_for_tokens, get_daily_calories
 from datetime import date
 import state
@@ -14,7 +19,7 @@ router = APIRouter()
 
 @router.get("/connect")
 def connect_whoop():
-    """Returns the Whoop OAuth URL — frontend redirects the user here."""
+    """Returns the Whoop OAuth URL — frontend redirects the user there."""
     return {"auth_url": get_auth_url()}
 
 
@@ -23,21 +28,24 @@ def whoop_status():
     return {"connected": state.WHOOP["access_token"] is not None}
 
 
-@router.get("/callback")
-async def whoop_callback(code: str):
+class CallbackRequest(BaseModel):
+    code: str
+
+
+@router.post("/callback")
+async def whoop_callback(req: CallbackRequest):
     """
-    Whoop redirects here after the user logs in.
-    Stores tokens in memory, then sends the browser back to the frontend.
+    Frontend POSTs the one-time code here after Whoop redirects.
+    Exchanges it for tokens and stores them in memory.
     """
     try:
-        tokens = await exchange_code_for_tokens(code)
+        tokens = await exchange_code_for_tokens(req.code)
         state.WHOOP["access_token"]  = tokens["access_token"]
         state.WHOOP["refresh_token"] = tokens["refresh_token"]
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
-    return RedirectResponse(url=f"{frontend_url}/profile?whoop=connected")
+    return {"status": "connected"}
 
 
 @router.get("/calories/today")
