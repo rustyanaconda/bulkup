@@ -19,13 +19,9 @@ def get_auth_url() -> str:
     After login, Whoop redirects to redirect_uri with a one-time `code`.
     """
     creds  = state.WHOOP_CREDS
-    scopes = " ".join([
-        "read:recovery",
-        "read:cycles",
-        "read:workout",
-        "read:profile",
-        "read:body_measurement",
-    ])
+    # Only request what the app actually uses.
+    # Enable both of these in your Whoop developer dashboard → app → Scopes.
+    scopes = "offline read:cycles"
     return (
         f"{WHOOP_AUTH_URL}"
         f"?client_id={creds['client_id']}"
