@@ -6,6 +6,7 @@ Whoop API reference: https://developer.whoop.com/api
 Apply for API access: https://developer-dashboard.whoop.com
 """
 import httpx
+import secrets
 import state
 
 WHOOP_BASE      = "https://api.prod.whoop.com/developer"
@@ -28,6 +29,7 @@ def get_auth_url() -> str:
         f"&redirect_uri={creds['redirect_uri']}"
         f"&response_type=code"
         f"&scope={scopes}"
+        f"&state={secrets.token_urlsafe(16)}"
     )
 
 
