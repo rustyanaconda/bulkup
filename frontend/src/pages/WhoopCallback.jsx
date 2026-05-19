@@ -24,6 +24,16 @@ export default function WhoopCallback() {
     if (called.current) return
     called.current = true
 
+    // Whoop sends ?error= when something goes wrong on their end
+    const whoopError = searchParams.get('error')
+    if (whoopError) {
+      const description = searchParams.get('error_description') || whoopError
+      const hint        = searchParams.get('error_hint')
+      setStatus('error')
+      setError(hint ? `${description}\n\nHint: ${hint}` : description)
+      return
+    }
+
     const code = searchParams.get('code')
     if (!code) {
       setStatus('error')
@@ -76,7 +86,7 @@ export default function WhoopCallback() {
           <>
             <div className="text-5xl mb-5">✕</div>
             <p className="text-red-400 font-semibold text-lg">Connection failed</p>
-            <p className="text-[#5C8C6E] text-sm mt-3 mb-5">{error}</p>
+            <p className="text-[#5C8C6E] text-sm mt-3 mb-5 text-left whitespace-pre-line">{error}</p>
             <button
               onClick={() => navigate('/profile')}
               className="px-6 py-2.5 bg-[#152A1E] border border-[#1E3A2A]
