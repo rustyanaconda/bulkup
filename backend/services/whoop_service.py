@@ -7,6 +7,7 @@ Apply for API access: https://developer-dashboard.whoop.com
 """
 import httpx
 import secrets
+from urllib.parse import urlencode
 import state
 
 WHOOP_BASE      = "https://api.prod.whoop.com/developer"
@@ -20,17 +21,14 @@ def get_auth_url() -> str:
     After login, Whoop redirects to redirect_uri with a one-time `code`.
     """
     creds  = state.WHOOP_CREDS
-    # Only request what the app actually uses.
-    # Enable both of these in your Whoop developer dashboard → app → Scopes.
-    scopes = "offline read:cycles"
-    return (
-        f"{WHOOP_AUTH_URL}"
-        f"?client_id={creds['client_id']}"
-        f"&redirect_uri={creds['redirect_uri']}"
-        f"&response_type=code"
-        f"&scope={scopes}"
-        f"&state={secrets.token_urlsafe(16)}"
-    )
+    params = {
+        "client_id":     creds["client_id"],
+        "redirect_uri":  creds["redirect_uri"],
+        "response_type": "code",
+        "scope":         "offline read:cycles",
+        "state":         secrets.token_urlsafe(16),
+    }
+    return f"{WHOOP_AUTH_URL}?{urlencode(params)}"
 
 
 async def exchange_code_for_tokens(code: str) -> dict:
