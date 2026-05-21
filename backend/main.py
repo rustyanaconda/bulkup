@@ -18,6 +18,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "https://bulkup-one.vercel.app",
+        "https://mise.fit",
+        "https://www.mise.fit",
         frontend_url,
     ],
     allow_credentials=True,
