@@ -34,13 +34,22 @@ export default function Meals() {
       </div>
 
       <div>
-        {meals.map(meal => (
-          <MealCard
-            key={meal.id}
-            meal={meal}
-            onStateChange={updateMealState}
-          />
-        ))}
+        {meals.length === 0 ? (
+          <div className="bg-[#152A1E] rounded-2xl p-6 border border-[#1E3A2A] text-center">
+            <p className="text-[#5C8C6E] text-sm">No meals planned for today.</p>
+            <p className="text-[#3A5C48] text-xs mt-1">
+              Meals you add will appear here each day.
+            </p>
+          </div>
+        ) : (
+          meals.map(meal => (
+            <MealCard
+              key={meal.id}
+              meal={meal}
+              onStateChange={updateMealState}
+            />
+          ))
+        )}
       </div>
     </div>
   )

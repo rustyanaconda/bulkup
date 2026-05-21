@@ -1,9 +1,5 @@
-/**
- * useWhoop — manages Whoop connection state and live calorie data.
- */
 import { useState } from 'react'
-
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+import { authFetch } from '../utils/api'
 
 export function useWhoop() {
   const [connected,  setConnected]  = useState(false)
@@ -12,14 +8,7 @@ export function useWhoop() {
   const [error,      setError]      = useState(null)
 
   async function connectWhoop() {
-    /**
-     * Kicks off the OAuth flow:
-     * 1. Ask backend for the Whoop auth URL
-     * 2. Redirect user to Whoop login
-     * 3. Whoop redirects back to /whoop/callback with a code
-     * 4. Backend exchanges code for tokens (handled in whoop router)
-     */
-    const res  = await fetch(`${API}/whoop/connect`)
+    const res  = await authFetch('/whoop/connect')
     const data = await res.json()
     window.location.href = data.auth_url
   }
@@ -28,14 +17,12 @@ export function useWhoop() {
     setLoading(true)
     setError(null)
     try {
-      // In production, access token comes from DB via the backend
-      // For now this is a placeholder — update once auth is wired up
-      const res  = await fetch(`${API}/whoop/calories/today`)
+      const res  = await authFetch('/whoop/calories/today')
       const data = await res.json()
       setBurnedKcal(data.burned_kcal)
       setConnected(true)
     } catch (err) {
-      setError('Could not fetch Whoop data')
+      if (err.message !== 'Unauthorized') setError('Could not fetch Whoop data')
       setBurnedKcal(null)
     } finally {
       setLoading(false)
@@ -45,7 +32,6 @@ export function useWhoop() {
   function disconnect() {
     setBurnedKcal(null)
     setConnected(false)
-    // TODO: call backend to revoke token
   }
 
   return { connected, burnedKcal, loading, error, connectWhoop, fetchTodaysBurn, disconnect }

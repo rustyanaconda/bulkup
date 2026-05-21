@@ -8,8 +8,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+import { authFetch } from '../utils/api'
 
 export default function WhoopCallback() {
   const [searchParams] = useSearchParams()
@@ -43,10 +42,9 @@ export default function WhoopCallback() {
 
     async function exchange() {
       try {
-        const res = await fetch(`${API}/whoop/callback`, {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ code }),
+        const res = await authFetch('/whoop/callback', {
+          method: 'POST',
+          body:   JSON.stringify({ code }),
         })
         if (!res.ok) {
           const data = await res.json()
@@ -55,8 +53,10 @@ export default function WhoopCallback() {
         setStatus('success')
         setTimeout(() => navigate('/'), 1500)
       } catch (err) {
-        setStatus('error')
-        setError(err.message)
+        if (err.message !== 'Unauthorized') {
+          setStatus('error')
+          setError(err.message)
+        }
       }
     }
 

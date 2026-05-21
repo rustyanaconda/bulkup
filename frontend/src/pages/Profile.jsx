@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link }                from 'react-router-dom'
 import { useCalories }         from '../hooks/useCalories'
-
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+import { authFetch }           from '../utils/api'
 
 export default function Profile() {
   const { breakdown, whoopConnected } = useCalories()
@@ -18,13 +17,15 @@ export default function Profile() {
   const [credsError,      setCredsError]      = useState(null)
 
   useEffect(() => {
-    fetch(`${API}/whoop/status`)
-      .then(r => r.json())
-      .then(d => {
+    async function checkStatus() {
+      try {
+        const res = await authFetch('/whoop/status')
+        const d   = await res.json()
         setConnected(d.connected)
         setCredentialsSet(d.credentials_set)
-      })
-      .catch(() => {})
+      } catch {}
+    }
+    checkStatus()
   }, [])
 
   async function handleSaveCredentials() {
@@ -32,10 +33,9 @@ export default function Profile() {
     setCredsError(null)
     try {
       const redirectUri = `${window.location.origin}/whoop/callback`
-      const res = await fetch(`${API}/whoop/credentials`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
+      const res = await authFetch('/whoop/credentials', {
+        method: 'POST',
+        body:   JSON.stringify({
           client_id:     clientId.trim(),
           client_secret: clientSecret.trim(),
           redirect_uri:  redirectUri,
@@ -44,7 +44,7 @@ export default function Profile() {
       if (!res.ok) throw new Error(`Server returned ${res.status}`)
       setCredentialsSet(true)
     } catch (err) {
-      setCredsError(err.message)
+      if (err.message !== 'Unauthorized') setCredsError(err.message)
     } finally {
       setSavingCreds(false)
     }
@@ -54,14 +54,16 @@ export default function Profile() {
     setConnecting(true)
     setConnectError(null)
     try {
-      const res = await fetch(`${API}/whoop/connect`)
+      const res = await authFetch('/whoop/connect')
       if (!res.ok) throw new Error(`Backend returned ${res.status}`)
       const data = await res.json()
       if (!data.auth_url) throw new Error('Backend did not return an auth_url')
       window.location.href = data.auth_url
     } catch (err) {
-      setConnectError(`${err.message} — API: ${API}`)
-      setConnecting(false)
+      if (err.message !== 'Unauthorized') {
+        setConnectError(err.message)
+        setConnecting(false)
+      }
     }
   }
 

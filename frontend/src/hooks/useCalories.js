@@ -1,10 +1,5 @@
-/**
- * useCalories — fetches the unified calorie picture for today.
- * Returns eaten (from meal state), burned (Whoop), and target (TDEE + surplus).
- */
 import { useState, useEffect, useCallback } from 'react'
-
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+import { authFetch } from '../utils/api'
 
 export function useCalories() {
   const [data,    setData]    = useState(null)
@@ -15,11 +10,11 @@ export function useCalories() {
     setLoading(true)
     setError(null)
     try {
-      const res  = await fetch(`${API}/calories/today`)
+      const res  = await authFetch('/calories/today')
       const json = await res.json()
       setData(json)
     } catch (err) {
-      setError(err.message)
+      if (err.message !== 'Unauthorized') setError(err.message)
     } finally {
       setLoading(false)
     }
