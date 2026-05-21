@@ -14,9 +14,49 @@ from routers.auth import get_current_user
 router = APIRouter()
 
 
+class MealCreate(BaseModel):
+    name:      str
+    calories:  int
+    meal_time: Literal["breakfast", "lunch", "dinner", "snack"]
+
+
 class MealStateUpdate(BaseModel):
     meal_id: int
     state:   Literal["done", "skipped", "upcoming"]
+
+
+@router.post("", status_code=201)
+def create_meal(
+    body: MealCreate,
+    user: User    = Depends(get_current_user),
+    db:   Session = Depends(get_db),
+):
+    meal = Meal(
+        user_id=user.id,
+        name=body.name,
+        calories=body.calories,
+        meal_time=body.meal_time,
+    )
+    db.add(meal)
+    db.flush()  # assigns meal.id without committing yet
+
+    log = MealLog(
+        user_id=user.id,
+        meal_id=meal.id,
+        date=date.today(),
+        state=MealState.upcoming,
+    )
+    db.add(log)
+    db.commit()
+    db.refresh(log)
+
+    return {
+        "id":        log.id,
+        "name":      meal.name,
+        "calories":  meal.calories,
+        "meal_time": meal.meal_time,
+        "state":     log.state.value,
+    }
 
 
 @router.get("/today")
