@@ -7,9 +7,9 @@ Docs at:   http://localhost:8000/docs
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import meals, whoop, users, calories
+from routers import meals, whoop, users, calories, auth
 
-app = FastAPI(title="BulkUp API", version="0.1.0")
+app = FastAPI(title="Mise API", version="0.1.0")
 
 frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
@@ -25,6 +25,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router,     prefix="/auth",     tags=["auth"])
 app.include_router(users.router,    prefix="/users",    tags=["users"])
 app.include_router(meals.router,    prefix="/meals",    tags=["meals"])
 app.include_router(calories.router, prefix="/calories", tags=["calories"])
@@ -33,4 +34,4 @@ app.include_router(whoop.router,    prefix="/whoop",    tags=["whoop"])
 
 @app.get("/")
 def health_check():
-    return {"status": "ok", "app": "BulkUp"}
+    return {"status": "ok", "app": "Mise"}
