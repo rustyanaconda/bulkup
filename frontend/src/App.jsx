@@ -6,20 +6,18 @@ import Shop          from './pages/Shop'
 import Profile       from './pages/Profile'
 import WhoopCallback from './pages/WhoopCallback'
 import Privacy       from './pages/Privacy'
+import Login         from './pages/Login'
+import Signup        from './pages/Signup'
 import BottomNav     from './components/BottomNav'
 
-/**
- * App — root component.
- *
- * /whoop/callback is a transient redirect-handler with no chrome.
- * All other routes share the BottomNav shell.
- */
 export default function App() {
   return (
     <Routes>
       {/* Standalone pages — no nav bar */}
       <Route path="/whoop/callback" element={<WhoopCallback />} />
       <Route path="/privacy"        element={<Privacy />} />
+      <Route path="/login"          element={<Login />} />
+      <Route path="/signup"         element={<Signup />} />
 
       {/* Main app shell — all routes share the BottomNav */}
       <Route path="*" element={
