@@ -1,12 +1,16 @@
 """
 Calorie target endpoints.
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from datetime import date
+
+from database import get_db
+from models.models import MealLog, Meal, MealState, User
+from routers.auth import get_current_user
 from services.tdee_service import calculate_target
 from services.whoop_service import get_daily_calories
-from datetime import date
-import state
 
 router = APIRouter()
 
@@ -23,10 +27,6 @@ class TDEERequest(BaseModel):
 
 @router.post("/tdee")
 def get_tdee(req: TDEERequest):
-    """
-    Calculate a user's daily calorie target.
-    Test it at http://localhost:8000/docs after starting the server.
-    """
     return calculate_target(
         weight_lbs=req.weight_lbs,
         height_in=req.height_in,
@@ -39,33 +39,41 @@ def get_tdee(req: TDEERequest):
 
 
 @router.get("/today")
-async def get_today():
-    """
-    The single endpoint the Home page needs:
-      - eaten_kcal  — sum of meals marked done
-      - burned_kcal — from Whoop (None if not connected or not yet scored)
-      - target_kcal — BMR + activity (Whoop or multiplier) + 500 surplus
-    """
-    eaten = sum(m["calories"] for m in state.MEALS if m["state"] == "done")
+async def get_today(
+    user: User    = Depends(get_current_user),
+    db:   Session = Depends(get_db),
+):
+    today = date.today()
 
-    # Try Whoop; silently fall back if not connected or data not ready yet
+    rows = (
+        db.query(MealLog, Meal)
+        .join(Meal, MealLog.meal_id == Meal.id)
+        .filter(
+            MealLog.user_id == user.id,
+            MealLog.date    == today,
+            MealLog.state   == MealState.done,
+        )
+        .all()
+    )
+    eaten = sum(
+        (log.calories_logged if log.calories_logged is not None else meal.calories) or 0
+        for log, meal in rows
+    )
+
     burned: int | None = None
-    if state.WHOOP["access_token"]:
+    if user.whoop_access_token:
         try:
-            burned = await get_daily_calories(
-                state.WHOOP["access_token"], date.today().isoformat()
-            )
+            burned = await get_daily_calories(user.whoop_access_token, today.isoformat())
         except Exception:
             pass
 
-    u = state.USER
     breakdown = calculate_target(
-        weight_lbs=u["weight_lbs"],
-        height_in=u["height_in"],
-        age=u["age"],
-        sex=u["sex"],
-        activity_multiplier=u["activity_multiplier"],
-        surplus_kcal=u["surplus_kcal"],
+        weight_lbs=user.weight_lbs          or 170,
+        height_in=user.height_in            or 70,
+        age=user.age                        or 25,
+        sex=user.sex                        or "male",
+        activity_multiplier=user.activity   or 1.55,
+        surplus_kcal=user.surplus           or 500,
         whoop_burned_kcal=burned,
     )
 

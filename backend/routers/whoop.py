@@ -6,28 +6,33 @@ OAuth flow:
   1. GET  /whoop/connect          → returns Whoop login URL
   2. User logs in on Whoop; Whoop redirects to FRONTEND /whoop/callback?code=XXX
   3. Frontend reads ?code= and POSTs it here:
-  4. POST /whoop/callback          → exchanges code for tokens, stores in memory
+  4. POST /whoop/callback          → exchanges code for tokens, stores on user row
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from services.whoop_service import get_auth_url, exchange_code_for_tokens, get_daily_calories
+from sqlalchemy.orm import Session
 from datetime import date
+
+from database import get_db
+from models.models import User
+from routers.auth import get_current_user
+from services.whoop_service import get_auth_url, exchange_code_for_tokens, get_daily_calories
 import state
 
 router = APIRouter()
 
 
 @router.get("/connect")
-def connect_whoop():
+def connect_whoop(user: User = Depends(get_current_user)):
     """Returns the Whoop OAuth URL — frontend redirects the user there."""
     return {"auth_url": get_auth_url()}
 
 
 @router.get("/status")
-def whoop_status():
+def whoop_status(user: User = Depends(get_current_user)):
     creds = state.WHOOP_CREDS
     return {
-        "connected":       state.WHOOP["access_token"] is not None,
+        "connected":       user.whoop_access_token is not None,
         "credentials_set": bool(creds["client_id"] and creds["client_secret"]),
     }
 
@@ -35,15 +40,15 @@ def whoop_status():
 class CredentialsRequest(BaseModel):
     client_id:     str
     client_secret: str
-    redirect_uri:  str  # sent by frontend as window.location.origin + '/whoop/callback'
+    redirect_uri:  str
 
 
 @router.post("/credentials")
-def save_credentials(req: CredentialsRequest):
-    """
-    Store Whoop developer app credentials entered via the Profile UI.
-    No restart needed — takes effect immediately.
-    """
+def save_credentials(
+    req:  CredentialsRequest,
+    user: User = Depends(get_current_user),
+):
+    """Store Whoop developer app credentials entered via the Profile UI."""
     state.WHOOP_CREDS["client_id"]     = req.client_id.strip()
     state.WHOOP_CREDS["client_secret"] = req.client_secret.strip()
     state.WHOOP_CREDS["redirect_uri"]  = req.redirect_uri.strip()
@@ -55,15 +60,17 @@ class CallbackRequest(BaseModel):
 
 
 @router.post("/callback")
-async def whoop_callback(req: CallbackRequest):
-    """
-    Frontend POSTs the one-time code here after Whoop redirects.
-    Exchanges it for tokens and stores them in memory.
-    """
+async def whoop_callback(
+    req:  CallbackRequest,
+    user: User    = Depends(get_current_user),
+    db:   Session = Depends(get_db),
+):
+    """Frontend POSTs the one-time code here after Whoop redirects."""
     try:
         tokens = await exchange_code_for_tokens(req.code)
-        state.WHOOP["access_token"]  = tokens["access_token"]
-        state.WHOOP["refresh_token"] = tokens["refresh_token"]
+        user.whoop_access_token  = tokens["access_token"]
+        user.whoop_refresh_token = tokens["refresh_token"]
+        db.commit()
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -71,13 +78,13 @@ async def whoop_callback(req: CallbackRequest):
 
 
 @router.get("/calories/today")
-async def get_todays_whoop_calories():
-    """Pull today's calorie burn from the stored Whoop token."""
-    if not state.WHOOP["access_token"]:
+async def get_todays_whoop_calories(user: User = Depends(get_current_user)):
+    """Pull today's calorie burn from the user's stored Whoop token."""
+    if not user.whoop_access_token:
         raise HTTPException(status_code=401, detail="Whoop not connected")
 
     today = date.today().isoformat()
-    kcal  = await get_daily_calories(state.WHOOP["access_token"], today)
+    kcal  = await get_daily_calories(user.whoop_access_token, today)
 
     if kcal is None:
         raise HTTPException(
