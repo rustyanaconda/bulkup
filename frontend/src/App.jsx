@@ -25,7 +25,7 @@ export default function App() {
       {/* Main app shell — requires login, all routes share the BottomNav */}
       <Route path="*" element={
         <ProtectedRoute>
-          <div className="max-w-md mx-auto min-h-screen relative bg-[#0D1A12]">
+          <div className="max-w-md mx-auto min-h-screen relative bg-[#F5EFE0]">
             <Routes>
               <Route path="/"         element={<Home />}     />
               <Route path="/meals"    element={<Meals />}    />

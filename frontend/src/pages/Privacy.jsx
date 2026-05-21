@@ -59,23 +59,23 @@ const SECTIONS = [
 
 export default function Privacy() {
   return (
-    <div className="min-h-screen bg-[#0D1A12] px-5 py-8 max-w-md mx-auto">
+    <div className="min-h-screen bg-[#F5EFE0] px-5 py-8 max-w-md mx-auto">
 
       {/* Back link */}
       <Link
         to="/profile"
-        className="inline-flex items-center gap-1.5 text-[#5C8C6E] text-sm mb-6
-                   hover:text-[#A3CEB5] transition-colors"
+        className="inline-flex items-center gap-1.5 text-[#6B7B8C] text-sm mb-6
+                   hover:text-[#1A2E45] transition-colors"
       >
         ← Back
       </Link>
 
       {/* Title */}
-      <h1 className="text-2xl font-bold text-white mb-1">Privacy Policy</h1>
-      <p className="text-xs text-[#5C8C6E] mb-5">Last updated: May 19, 2026</p>
+      <h1 className="text-2xl font-bold text-[#1A2E45] mb-1">Privacy Policy</h1>
+      <p className="text-xs text-[#A89F88] mb-5">Last updated: May 19, 2026</p>
 
       {/* Intro */}
-      <p className="text-sm text-[#A3CEB5] leading-relaxed mb-8">
+      <p className="text-sm text-[#2C2C2A] leading-relaxed mb-8">
         Welcome to Mise. This policy explains what data we collect, how we use it,
         and the choices you have. We've tried to keep it simple and direct.
       </p>
@@ -84,21 +84,21 @@ export default function Privacy() {
       <div className="space-y-8">
         {SECTIONS.map(({ heading, intro, body, bullets }) => (
           <section key={heading}>
-            <h2 className="text-base font-semibold text-white mb-2">{heading}</h2>
+            <h2 className="text-base font-semibold text-[#1A2E45] mb-2">{heading}</h2>
 
             {intro && (
-              <p className="text-sm text-[#A3CEB5] leading-relaxed mb-2">{intro}</p>
+              <p className="text-sm text-[#2C2C2A] leading-relaxed mb-2">{intro}</p>
             )}
 
             {body && body.map((p, i) => (
-              <p key={i} className="text-sm text-[#A3CEB5] leading-relaxed mb-2">{p}</p>
+              <p key={i} className="text-sm text-[#2C2C2A] leading-relaxed mb-2">{p}</p>
             ))}
 
             {bullets && (
               <ul className="space-y-1.5">
                 {bullets.map((item, i) => (
-                  <li key={i} className="flex gap-2 text-sm text-[#A3CEB5] leading-relaxed">
-                    <span className="text-[#3A5C48] mt-0.5 flex-shrink-0">–</span>
+                  <li key={i} className="flex gap-2 text-sm text-[#2C2C2A] leading-relaxed">
+                    <span className="text-[#A89F88] mt-0.5 flex-shrink-0">–</span>
                     <span>{item}</span>
                   </li>
                 ))}
@@ -109,12 +109,12 @@ export default function Privacy() {
 
         {/* Contact — separate because it has a mailto link */}
         <section>
-          <h2 className="text-base font-semibold text-white mb-2">Contact</h2>
-          <p className="text-sm text-[#A3CEB5] leading-relaxed">
+          <h2 className="text-base font-semibold text-[#1A2E45] mb-2">Contact</h2>
+          <p className="text-sm text-[#2C2C2A] leading-relaxed">
             Questions about this policy or your data? Email us at:{' '}
             <a
               href="mailto:patmcguigan98@gmail.com"
-              className="text-green-400 hover:text-green-300 transition-colors"
+              className="text-[#1A2E45] underline hover:opacity-70 transition-opacity"
             >
               patmcguigan98@gmail.com
             </a>
@@ -122,7 +122,6 @@ export default function Privacy() {
         </section>
       </div>
 
-      {/* Bottom breathing room */}
       <div className="h-12" />
     </div>
   )

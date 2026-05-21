@@ -75,13 +75,17 @@ export default function Profile() {
     }
   }
 
+  const inputClass = `w-full bg-[#F5EFE0] border border-[#E3DBC9] rounded-xl px-3 py-2.5
+                      text-sm text-[#1A2E45] placeholder-[#A89F88] focus:outline-none
+                      focus:border-[#1A2E45]`
+
   return (
     <div className="p-4 pb-24">
-      <h1 className="text-xl font-bold text-white mb-4">Profile</h1>
+      <h1 className="text-xl font-bold text-[#1A2E45] mb-4">Profile</h1>
 
       {/* User stats */}
-      <div className="bg-[#152A1E] rounded-2xl p-4 border border-[#1E3A2A] mb-4">
-        <p className="text-xs text-[#5C8C6E] uppercase tracking-wide font-semibold mb-3">
+      <div className="bg-white rounded-2xl p-4 border border-[#E3DBC9] mb-4">
+        <p className="text-xs text-[#6B7B8C] uppercase tracking-wide font-semibold mb-3">
           Your Stats
         </p>
         <div className="grid grid-cols-3 gap-3 text-center">
@@ -93,9 +97,9 @@ export default function Profile() {
             { label: 'Activity', value: 'Moderate'  },
             { label: 'Goal',     value: '180 lbs'   },
           ].map(({ label, value }) => (
-            <div key={label} className="bg-[#0D2A1A] rounded-xl p-2">
-              <div className="text-sm font-bold text-white">{value}</div>
-              <div className="text-[10px] text-[#5C8C6E] mt-0.5">{label}</div>
+            <div key={label} className="bg-[#EFE8D8] rounded-xl p-2">
+              <div className="text-sm font-bold text-[#1A2E45]">{value}</div>
+              <div className="text-[10px] text-[#6B7B8C] mt-0.5">{label}</div>
             </div>
           ))}
         </div>
@@ -103,8 +107,8 @@ export default function Profile() {
 
       {/* TDEE breakdown */}
       {breakdown && (
-        <div className="bg-[#152A1E] rounded-2xl p-4 border border-[#1E3A2A] mb-4">
-          <p className="text-xs text-[#5C8C6E] uppercase tracking-wide font-semibold mb-3">
+        <div className="bg-white rounded-2xl p-4 border border-[#E3DBC9] mb-4">
+          <p className="text-xs text-[#6B7B8C] uppercase tracking-wide font-semibold mb-3">
             Today's Target ({breakdown.source === 'whoop' ? 'Whoop-powered' : 'estimated'})
           </p>
           <div className="space-y-2">
@@ -114,26 +118,26 @@ export default function Profile() {
               { label: 'Surplus',  value: breakdown.surplus   },
             ].map(({ label, value }) => (
               <div key={label} className="flex justify-between text-sm">
-                <span className="text-[#5C8C6E]">{label}</span>
-                <span className="text-white font-medium">{value.toLocaleString()} kcal</span>
+                <span className="text-[#6B7B8C]">{label}</span>
+                <span className="text-[#2C2C2A] font-medium">{value.toLocaleString()} kcal</span>
               </div>
             ))}
-            <div className="border-t border-[#1E3A2A] pt-2 flex justify-between text-sm">
-              <span className="text-[#A3CEB5] font-semibold">Total target</span>
-              <span className="text-green-400 font-bold">{breakdown.target.toLocaleString()} kcal</span>
+            <div className="border-t border-[#E3DBC9] pt-2 flex justify-between text-sm">
+              <span className="text-[#1A2E45] font-semibold">Total target</span>
+              <span className="text-[#1A2E45] font-bold">{breakdown.target.toLocaleString()} kcal</span>
             </div>
           </div>
         </div>
       )}
 
       {/* ── Whoop section ─────────────────────────────────────── */}
-      <div className="bg-[#152A1E] rounded-2xl p-4 border border-[#1E3A2A]">
+      <div className="bg-white rounded-2xl p-4 border border-[#E3DBC9]">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-xs text-[#5C8C6E] uppercase tracking-wide font-semibold">Whoop</p>
+          <p className="text-xs text-[#6B7B8C] uppercase tracking-wide font-semibold">Whoop</p>
           <div className={`flex items-center gap-1.5 text-xs font-semibold
-                           ${connected ? 'text-green-400' : 'text-[#5C8C6E]'}`}>
+                           ${connected ? 'text-[#2A5A3E]' : 'text-[#6B7B8C]'}`}>
             <div className={`w-1.5 h-1.5 rounded-full
-                             ${connected ? 'bg-green-400' : 'bg-[#3A5C48]'}`} />
+                             ${connected ? 'bg-[#2A5A3E]' : 'bg-[#D4CDB9]'}`} />
             {connected ? 'Connected' : credentialsSet ? 'Not connected' : 'Setup required'}
           </div>
         </div>
@@ -141,19 +145,19 @@ export default function Profile() {
         {/* State 1 — no credentials yet */}
         {!credentialsSet && !connected && (
           <>
-            <p className="text-xs text-[#5C8C6E] mb-1">
+            <p className="text-xs text-[#6B7B8C] mb-1">
               Get your credentials from{' '}
               <a
                 href="https://developer-dashboard.whoop.com"
                 target="_blank"
                 rel="noreferrer"
-                className="text-green-400 underline"
+                className="text-[#1A2E45] underline"
               >
                 developer-dashboard.whoop.com
               </a>
               . When creating your Whoop app, set the Redirect URI to:
             </p>
-            <p className="text-[10px] font-mono text-white bg-[#0D2A1A] rounded-lg px-3 py-2 mb-3 break-all">
+            <p className="text-[10px] font-mono text-[#1A2E45] bg-[#EFE8D8] rounded-lg px-3 py-2 mb-3 break-all">
               {window.location.origin}/whoop/callback
             </p>
 
@@ -163,31 +167,27 @@ export default function Profile() {
                 placeholder="Client ID"
                 value={clientId}
                 onChange={e => setClientId(e.target.value)}
-                className="w-full bg-[#0D2A1A] border border-[#1E3A2A] rounded-xl px-3 py-2.5
-                           text-sm text-white placeholder-[#3A5C48] focus:outline-none
-                           focus:border-green-700"
+                className={inputClass}
               />
               <input
                 type="password"
                 placeholder="Client Secret"
                 value={clientSecret}
                 onChange={e => setClientSecret(e.target.value)}
-                className="w-full bg-[#0D2A1A] border border-[#1E3A2A] rounded-xl px-3 py-2.5
-                           text-sm text-white placeholder-[#3A5C48] focus:outline-none
-                           focus:border-green-700"
+                className={inputClass}
               />
             </div>
 
             <button
               onClick={handleSaveCredentials}
               disabled={savingCreds || !clientId || !clientSecret}
-              className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-500
+              className="w-full py-3 rounded-xl bg-[#1A2E45] hover:bg-[#152639]
                          disabled:opacity-40 text-white text-sm font-semibold transition-colors"
             >
               {savingCreds ? 'Saving…' : 'Save credentials'}
             </button>
             {credsError && (
-              <p className="mt-2 text-xs text-red-400">{credsError}</p>
+              <p className="mt-2 text-xs text-[#A32D2D]">{credsError}</p>
             )}
           </>
         )}
@@ -198,17 +198,17 @@ export default function Profile() {
             <button
               onClick={handleConnectWhoop}
               disabled={connecting}
-              className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-500
+              className="w-full py-3 rounded-xl bg-[#1A2E45] hover:bg-[#152639]
                          disabled:opacity-50 text-white text-sm font-semibold transition-colors"
             >
               {connecting ? 'Redirecting to Whoop…' : 'Connect Whoop'}
             </button>
             {connectError && (
-              <p className="mt-3 text-xs text-red-400 break-all">{connectError}</p>
+              <p className="mt-3 text-xs text-[#A32D2D] break-all">{connectError}</p>
             )}
             <button
               onClick={() => { setCredentialsSet(false); setClientId(''); setClientSecret('') }}
-              className="mt-2 w-full py-2 text-xs text-[#5C8C6E] hover:text-white transition-colors"
+              className="mt-2 w-full py-2 text-xs text-[#6B7B8C] hover:text-[#1A2E45] transition-colors"
             >
               Re-enter credentials
             </button>
@@ -217,7 +217,7 @@ export default function Profile() {
 
         {/* State 3 — connected */}
         {connected && (
-          <p className="text-xs text-[#5C8C6E]">
+          <p className="text-xs text-[#6B7B8C]">
             Calorie burn is being pulled from your Whoop automatically.
             {!whoopConnected && ' Wear your Whoop today for live data.'}
           </p>
@@ -225,7 +225,7 @@ export default function Profile() {
       </div>
 
       <div className="mt-8 text-center">
-        <Link to="/privacy" className="text-xs text-[#3A5C48] hover:text-[#5C8C6E] transition-colors">
+        <Link to="/privacy" className="text-xs text-[#A89F88] hover:text-[#6B7B8C] transition-colors">
           Privacy Policy
         </Link>
       </div>
@@ -233,8 +233,8 @@ export default function Profile() {
       <div className="mt-4 pb-2">
         <button
           onClick={handleLogout}
-          className="w-full py-2.5 rounded-xl border border-red-900/50 text-red-400/70
-                     hover:border-red-800 hover:text-red-400 text-sm transition-colors"
+          className="w-full py-2.5 rounded-xl border border-[#A32D2D]/30 text-[#A32D2D]/60
+                     hover:border-[#A32D2D] hover:text-[#A32D2D] text-sm transition-colors"
         >
           Log out
         </button>

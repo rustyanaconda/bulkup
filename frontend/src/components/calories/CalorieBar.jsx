@@ -13,40 +13,39 @@ export default function CalorieBar({ eaten = 0, planned = 0, target = 3240 }) {
   const surplusHit = remaining === 0
 
   return (
-    <div className="bg-[#152A1E] rounded-2xl p-4 border border-[#1E3A2A]">
+    <div className="bg-white rounded-2xl p-4 border border-[#E3DBC9]">
       <div className="flex justify-between items-center mb-3">
-        <span className="text-xs font-semibold text-[#5C8C6E] uppercase tracking-wide">
+        <span className="text-xs font-semibold text-[#6B7B8C] uppercase tracking-wide">
           Today's progress
         </span>
-        <span className="text-sm font-bold text-green-400">
+        <span className="text-sm font-bold text-[#1A2E45]">
           {eaten.toLocaleString()} / {target.toLocaleString()} kcal
         </span>
       </div>
 
       {/* Multi-segment bar */}
-      <div className="h-2.5 bg-[#1A2A1A] rounded-full overflow-hidden flex mb-3">
+      <div className="h-2.5 bg-[#EFE8D8] rounded-full overflow-hidden flex mb-3">
         <div
-          className="h-full bg-gradient-to-r from-green-500 to-teal-400 rounded-l-full
-                     transition-all duration-500"
+          className="h-full bg-[#1A2E45] rounded-l-full transition-all duration-500"
           style={{ width: `${eatenPct}%` }}
         />
         <div
-          className="h-full bg-[#1E4A2A] transition-all duration-500"
+          className="h-full bg-[#1A2E45]/20 transition-all duration-500"
           style={{ width: `${plannedPct}%` }}
         />
       </div>
 
       {/* Legend */}
-      <div className="flex justify-between items-center text-xs text-[#5C8C6E]">
+      <div className="flex justify-between items-center text-xs text-[#6B7B8C]">
         <div className="flex items-center gap-1.5">
-          <div className="w-2 h-2 rounded-full bg-green-400" />
+          <div className="w-2 h-2 rounded-full bg-[#1A2E45]" />
           <span>Eaten</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="w-2 h-2 rounded-full bg-[#1E4A2A] border border-green-900" />
+          <div className="w-2 h-2 rounded-full bg-[#1A2E45]/20 border border-[#1A2E45]/30" />
           <span>Planned</span>
         </div>
-        <span className={surplusHit ? 'text-green-400 font-semibold' : 'text-orange-400 font-semibold'}>
+        <span className={surplusHit ? 'text-[#2A5A3E] font-semibold' : 'text-[#B07B2C] font-semibold'}>
           {surplusHit
             ? '🎉 Surplus hit!'
             : `${remaining.toLocaleString()} kcal to go`}

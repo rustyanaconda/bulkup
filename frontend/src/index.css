@@ -2,16 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Design tokens — match what we built in the prototypes */
+/* Design tokens — navy + cream light theme */
 :root {
-  --bg:      #0D1A12;
-  --surface: #152A1E;
-  --border:  #1E3A2A;
-  --green:   #2ECC71;
-  --red:     #E74C3C;
-  --orange:  #F5A623;
-  --text:    #E8F5ED;
-  --muted:   #5C8C6E;
+  --bg:           #F5EFE0;
+  --surface:      #FFFFFF;
+  --surface-2:    #EFE8D8;
+  --border:       #E3DBC9;
+  --primary:      #1A2E45;
+  --text:         #1A2E45;
+  --text-body:    #2C2C2A;
+  --text-muted:   #6B7B8C;
+  --text-faint:   #A89F88;
+  --accent:       #B07B2C;
+  --success:      #2A5A3E;
+  --danger:       #A32D2D;
 }
 
 body {

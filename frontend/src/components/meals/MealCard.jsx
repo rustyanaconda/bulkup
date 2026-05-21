@@ -1,48 +1,37 @@
-/**
- * MealCard — displays one meal with tap-to-act interactions.
- *
- * Props:
- *   meal           { id, name, calories, meal_time, state }
- *   onStateChange  function(mealId, newState)
- *
- * This is the React version of what we built in the prototypes.
- * The swipe gesture logic will be added here next.
- */
 import { useState } from 'react'
 
-// Visual styles for each meal state
 const STATE_CONFIG = {
   done: {
-    dot:   'bg-green-400',
-    badge: 'bg-green-950 text-green-400',
+    dot:   'bg-[#2A5A3E]',
+    badge: 'bg-[#2A5A3E]/10 text-[#2A5A3E]',
     label: 'Done',
-    card:  'bg-[#0D2A1A] border-[#1A3A22]',
-    text:  'text-[#5C8C6E]',
-    kcal:  'text-green-400',
+    card:  'bg-[#EFE8D8] border-[#D4CDB9]',
+    text:  'text-[#6B7B8C]',
+    kcal:  'text-[#2A5A3E]',
   },
   skipped: {
-    dot:   'bg-red-500',
-    badge: 'bg-red-950 text-red-400',
+    dot:   'bg-[#A32D2D]',
+    badge: 'bg-[#A32D2D]/10 text-[#A32D2D]',
     label: 'Skipped',
-    card:  'bg-[#111E15] border-[#1E2A1E]',
-    text:  'text-[#3A5C48] line-through',
-    kcal:  'text-red-400',
+    card:  'bg-[#EFE8D8] border-[#E3DBC9]',
+    text:  'text-[#A89F88] line-through',
+    kcal:  'text-[#A32D2D]',
   },
   upcoming: {
-    dot:   'bg-[#1E3028] border border-[#3A5C48]',
-    badge: 'bg-[#1A2A3A] text-blue-400',
+    dot:   'bg-[#E3DBC9] border border-[#A89F88]',
+    badge: 'bg-[#1A2E45]/10 text-[#1A2E45]',
     label: 'Up next',
-    card:  'bg-[#152A1E] border-[#1E3A2A] hover:border-[#2A4A32]',
-    text:  'text-white',
-    kcal:  'text-[#A3CEB5]',
+    card:  'bg-white border-[#E3DBC9] hover:border-[#D4CDB9]',
+    text:  'text-[#1A2E45]',
+    kcal:  'text-[#6B7B8C]',
   },
   missed: {
-    dot:   'bg-[#1E3028] border border-[#3A5C48]',
-    badge: 'bg-[#1E2A1A] text-orange-400',
+    dot:   'bg-[#E3DBC9] border border-[#A89F88]',
+    badge: 'bg-[#B07B2C]/10 text-[#B07B2C]',
     label: 'Missed',
-    card:  'bg-[#152A1E] border-[#1E3A2A] hover:border-[#2A4A32]',
-    text:  'text-white',
-    kcal:  'text-[#A3CEB5]',
+    card:  'bg-white border-[#E3DBC9] hover:border-[#D4CDB9]',
+    text:  'text-[#1A2E45]',
+    kcal:  'text-[#6B7B8C]',
   },
 }
 
@@ -69,7 +58,7 @@ export default function MealCard({ meal, onStateChange }) {
           <div className={`text-sm font-semibold truncate ${cfg.text}`}>
             {meal.name}
           </div>
-          <div className="text-xs text-[#5C8C6E] mt-0.5 capitalize">
+          <div className="text-xs text-[#A89F88] mt-0.5 capitalize">
             {meal.meal_time}
           </div>
         </div>
@@ -85,11 +74,11 @@ export default function MealCard({ meal, onStateChange }) {
 
       {/* Context menu */}
       {menuOpen && (
-        <div className="mt-1 bg-[#1A2A1E] rounded-xl border border-[#2A3A2A] overflow-hidden">
+        <div className="mt-1 bg-[#F5EFE0] rounded-xl border border-[#E3DBC9] overflow-hidden">
 
           {meal.state !== 'done' && (
             <MenuItem
-              icon="✓" iconColor="text-green-400"
+              icon="✓" iconColor="text-[#2A5A3E]"
               label="Mark as done" sub="Log it as eaten"
               onClick={() => act('done')}
             />
@@ -97,7 +86,7 @@ export default function MealCard({ meal, onStateChange }) {
 
           {meal.state !== 'skipped' && meal.state !== 'done' && (
             <MenuItem
-              icon="✕" iconColor="text-red-400"
+              icon="✕" iconColor="text-[#A32D2D]"
               label="Skip this meal" sub={`${meal.calories} kcal will be redistributed`}
               onClick={() => act('skipped')}
             />
@@ -105,14 +94,14 @@ export default function MealCard({ meal, onStateChange }) {
 
           {(meal.state === 'skipped' || meal.state === 'done') && (
             <MenuItem
-              icon="↩" iconColor="text-[#888780]"
+              icon="↩" iconColor="text-[#6B7B8C]"
               label="Undo" sub={`Restore ${meal.name}`}
               onClick={() => act('upcoming')}
             />
           )}
 
           <MenuItem
-            icon="✕" iconColor="text-[#5C8C6E]"
+            icon="✕" iconColor="text-[#A89F88]"
             label="Cancel" sub=""
             onClick={() => setMenuOpen(false)}
           />
@@ -122,19 +111,18 @@ export default function MealCard({ meal, onStateChange }) {
   )
 }
 
-// Small helper component — keeps the menu items DRY
 function MenuItem({ icon, iconColor, label, sub, onClick }) {
   return (
     <button
       onClick={onClick}
       className="w-full flex items-center gap-3 px-4 py-3 text-left
-                 hover:bg-[#1E3028] transition-colors border-b border-[#152A1E]
+                 hover:bg-[#EFE8D8] transition-colors border-b border-[#E3DBC9]
                  last:border-b-0"
     >
       <span className={`text-base w-5 text-center ${iconColor}`}>{icon}</span>
       <div>
-        <div className="text-sm font-semibold text-white">{label}</div>
-        {sub && <div className="text-xs text-[#5C8C6E]">{sub}</div>}
+        <div className="text-sm font-semibold text-[#1A2E45]">{label}</div>
+        {sub && <div className="text-xs text-[#6B7B8C]">{sub}</div>}
       </div>
     </button>
   )
