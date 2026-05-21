@@ -1,10 +1,18 @@
 import { useState, useEffect } from 'react'
-import { Link }                from 'react-router-dom'
+import { Link, useNavigate }   from 'react-router-dom'
 import { useCalories }         from '../hooks/useCalories'
 import { authFetch }           from '../utils/api'
+import { useAuth }             from '../context/AuthContext'
 
 export default function Profile() {
   const { breakdown, whoopConnected } = useCalories()
+  const { logout } = useAuth()
+  const navigate   = useNavigate()
+
+  function handleLogout() {
+    logout()
+    navigate('/login')
+  }
 
   const [connected,       setConnected]       = useState(false)
   const [credentialsSet,  setCredentialsSet]  = useState(false)
@@ -220,6 +228,16 @@ export default function Profile() {
         <Link to="/privacy" className="text-xs text-[#3A5C48] hover:text-[#5C8C6E] transition-colors">
           Privacy Policy
         </Link>
+      </div>
+
+      <div className="mt-4 pb-2">
+        <button
+          onClick={handleLogout}
+          className="w-full py-2.5 rounded-xl border border-red-900/50 text-red-400/70
+                     hover:border-red-800 hover:text-red-400 text-sm transition-colors"
+        >
+          Log out
+        </button>
       </div>
     </div>
   )
