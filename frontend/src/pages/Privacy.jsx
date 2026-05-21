@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 const SECTIONS = [
   {
     heading: 'What data we collect',
-    intro: 'When you use BulkUp, we collect:',
+    intro: 'When you use Mise, we collect:',
     bullets: [
       'Account information you provide: your name and email address',
       'Health and fitness data you enter: weight, height, age, sex, meal selections, calorie targets, and weight goals',
@@ -25,7 +25,7 @@ const SECTIONS = [
   {
     heading: 'Who we share data with',
     body: [
-      'We do not sell your data. We do not share it with advertisers. We do not use it for any purpose other than running BulkUp.',
+      'We do not sell your data. We do not share it with advertisers. We do not use it for any purpose other than running Mise.',
       'The only third parties involved in processing your data are:',
     ],
     bullets: [
@@ -76,7 +76,7 @@ export default function Privacy() {
 
       {/* Intro */}
       <p className="text-sm text-[#A3CEB5] leading-relaxed mb-8">
-        Welcome to BulkUp. This policy explains what data we collect, how we use it,
+        Welcome to Mise. This policy explains what data we collect, how we use it,
         and the choices you have. We've tried to keep it simple and direct.
       </p>
 

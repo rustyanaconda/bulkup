@@ -1,4 +1,4 @@
-# BulkUp 🥗
+# Mise
 
 Healthy weight gain app — clean food, Whoop integration, smart calorie targeting.
 
