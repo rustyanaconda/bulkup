@@ -38,10 +38,10 @@ export function useMeals() {
     }
   }
 
-  async function addMeal({ name, calories, meal_time }) {
+  async function addMeal({ name, calories, meal_time, tag_ids = [] }) {
     const res  = await authFetch('/meals', {
       method: 'POST',
-      body:   JSON.stringify({ name, calories, meal_time }),
+      body:   JSON.stringify({ name, calories, meal_time, tag_ids }),
     })
     if (!res.ok) {
       const data = await res.json()

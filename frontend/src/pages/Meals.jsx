@@ -1,20 +1,44 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useMeals }    from '../hooks/useMeals'
 import { useCalories } from '../hooks/useCalories'
 import MealCard        from '../components/meals/MealCard'
 import CalorieBar      from '../components/calories/CalorieBar'
+import { authFetch }   from '../utils/api'
 
 const MEAL_TIMES = ['breakfast', 'lunch', 'dinner', 'snack']
 
 const EMPTY_FORM = { name: '', calories: '', meal_time: 'breakfast' }
 
-function AddMealModal({ onClose, onAdd }) {
-  const [form,    setForm]    = useState(EMPTY_FORM)
-  const [saving,  setSaving]  = useState(false)
-  const [error,   setError]   = useState(null)
+const TAG_GROUPS = [
+  { label: 'Tags',    type: 'primary'     },
+  { label: 'Dietary', type: 'restriction' },
+  { label: 'More',    type: 'secondary'   },
+]
 
-  function set(field, value) {
+function AddMealModal({ onClose, onAdd }) {
+  const [form,        setForm]        = useState(EMPTY_FORM)
+  const [saving,      setSaving]      = useState(false)
+  const [error,       setError]       = useState(null)
+  const [allTags,     setAllTags]     = useState([])
+  const [selectedIds, setSelectedIds] = useState(new Set())
+
+  useEffect(() => {
+    authFetch('/meals/tags')
+      .then(r => r.json())
+      .then(tags => setAllTags(tags))
+      .catch(() => {})
+  }, [])
+
+  function setField(field, value) {
     setForm(prev => ({ ...prev, [field]: value }))
+  }
+
+  function toggleTag(id) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
   }
 
   async function handleSubmit(e) {
@@ -26,6 +50,7 @@ function AddMealModal({ onClose, onAdd }) {
         name:      form.name.trim(),
         calories:  parseInt(form.calories, 10),
         meal_time: form.meal_time,
+        tag_ids:   [...selectedIds],
       })
       onClose()
     } catch (err) {
@@ -40,17 +65,14 @@ function AddMealModal({ onClose, onAdd }) {
                       focus:border-[#1A2E45]`
 
   return (
-    /* Backdrop */
     <div
       className="fixed inset-0 z-50 flex items-end justify-center"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      {/* Semi-transparent overlay */}
       <div className="absolute inset-0 bg-[#1A2E45]/30" />
 
-      {/* Sheet */}
       <div className="relative w-full max-w-md bg-white rounded-t-3xl p-6
-                      shadow-xl border-t border-[#E3DBC9]">
+                      shadow-xl border-t border-[#E3DBC9] max-h-[90vh] overflow-y-auto">
 
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-base font-bold text-[#1A2E45]">Add meal</h2>
@@ -75,7 +97,7 @@ function AddMealModal({ onClose, onAdd }) {
               required
               autoFocus
               value={form.name}
-              onChange={e => set('name', e.target.value)}
+              onChange={e => setField('name', e.target.value)}
               placeholder="e.g. Salmon rice bowl"
               className={inputClass}
             />
@@ -92,7 +114,7 @@ function AddMealModal({ onClose, onAdd }) {
                 min="1"
                 max="9999"
                 value={form.calories}
-                onChange={e => set('calories', e.target.value)}
+                onChange={e => setField('calories', e.target.value)}
                 placeholder="650"
                 className={inputClass}
               />
@@ -104,7 +126,7 @@ function AddMealModal({ onClose, onAdd }) {
               </label>
               <select
                 value={form.meal_time}
-                onChange={e => set('meal_time', e.target.value)}
+                onChange={e => setField('meal_time', e.target.value)}
                 className={`${inputClass} capitalize`}
               >
                 {MEAL_TIMES.map(t => (
@@ -113,6 +135,41 @@ function AddMealModal({ onClose, onAdd }) {
               </select>
             </div>
           </div>
+
+          {/* Tag picker */}
+          {allTags.length > 0 && (
+            <div className="space-y-3 pt-1">
+              {TAG_GROUPS.map(({ label, type }) => {
+                const group = allTags.filter(t => t.tag_type === type)
+                if (group.length === 0) return null
+                return (
+                  <div key={type}>
+                    <p className="text-xs text-[#A89F88] uppercase tracking-wide font-semibold mb-1.5">
+                      {label}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {group.map(tag => {
+                        const selected = selectedIds.has(tag.id)
+                        return (
+                          <button
+                            key={tag.id}
+                            type="button"
+                            onClick={() => toggleTag(tag.id)}
+                            className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors
+                                        ${selected
+                                          ? 'bg-[#1A2E45] text-white'
+                                          : 'border border-[#E3DBC9] text-[#6B7B8C] hover:border-[#D4CDB9] bg-transparent'}`}
+                          >
+                            {tag.name}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
 
           {error && (
             <p className="text-sm text-[#A32D2D] bg-[#A32D2D]/10 rounded-xl px-3 py-2">
@@ -181,7 +238,6 @@ export default function Meals() {
         )}
       </div>
 
-      {/* Add meal button */}
       <button
         onClick={() => setShowModal(true)}
         className="mt-4 w-full py-3 rounded-2xl bg-[#1A2E45] hover:bg-[#152639]

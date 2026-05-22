@@ -35,9 +35,16 @@ const STATE_CONFIG = {
   },
 }
 
+const TAG_CHIP = {
+  primary:     'bg-[#1A2E45]/10 text-[#1A2E45]',
+  restriction: 'bg-[#B07B2C]/10 text-[#B07B2C]',
+}
+
 export default function MealCard({ meal, onStateChange }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const cfg = STATE_CONFIG[meal.state] || STATE_CONFIG.upcoming
+
+  const visibleTags = (meal.tags ?? []).filter(t => t.tag_type === 'primary' || t.tag_type === 'restriction')
 
   function act(newState) {
     onStateChange(meal.id, newState)
@@ -61,6 +68,19 @@ export default function MealCard({ meal, onStateChange }) {
           <div className="text-xs text-[#A89F88] mt-0.5 capitalize">
             {meal.meal_time}
           </div>
+          {visibleTags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {visibleTags.map(tag => (
+                <span
+                  key={tag.id}
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium
+                              ${TAG_CHIP[tag.tag_type]}`}
+                >
+                  {tag.name}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className={`text-xs font-medium ${cfg.kcal}`}>
