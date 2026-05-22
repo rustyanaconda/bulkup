@@ -71,10 +71,13 @@ function AddMealModal({ onClose, onAdd }) {
     >
       <div className="absolute inset-0 bg-[#1A2E45]/30" />
 
-      <div className="relative w-full max-w-md bg-white rounded-t-3xl p-6
-                      shadow-xl border-t border-[#E3DBC9] max-h-[90vh] overflow-y-auto">
+      {/* Sheet — flex column, capped at 85vh so it never overflows the screen */}
+      <div className="relative w-full max-w-md bg-white rounded-t-3xl
+                      shadow-xl border-t border-[#E3DBC9]
+                      flex flex-col max-h-[85vh]">
 
-        <div className="flex items-center justify-between mb-5">
+        {/* Fixed header */}
+        <div className="flex items-center justify-between px-6 pt-6 pb-4 flex-shrink-0">
           <h2 className="text-base font-bold text-[#1A2E45]">Add meal</h2>
           <button
             onClick={onClose}
@@ -86,8 +89,12 @@ function AddMealModal({ onClose, onAdd }) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-
+        {/* Scrollable body — grows to fill available space and scrolls when tall */}
+        <form
+          id="add-meal-form"
+          onSubmit={handleSubmit}
+          className="flex-1 overflow-y-auto px-6 space-y-4 pb-2"
+        >
           <div>
             <label className="block text-xs text-[#6B7B8C] uppercase tracking-wide font-semibold mb-1.5">
               Meal name
@@ -138,7 +145,7 @@ function AddMealModal({ onClose, onAdd }) {
 
           {/* Tag picker */}
           {allTags.length > 0 && (
-            <div className="space-y-3 pt-1">
+            <div className="space-y-3 pt-1 pb-1">
               {TAG_GROUPS.map(({ label, type }) => {
                 const group = allTags.filter(t => t.tag_type === type)
                 if (group.length === 0) return null
@@ -176,16 +183,20 @@ function AddMealModal({ onClose, onAdd }) {
               {error}
             </p>
           )}
+        </form>
 
+        {/* Fixed footer — always visible, button never pushed off screen */}
+        <div className="px-6 pt-3 pb-6 flex-shrink-0 border-t border-[#E3DBC9]">
           <button
             type="submit"
+            form="add-meal-form"
             disabled={saving || !form.name.trim() || !form.calories}
             className="w-full py-3 rounded-xl bg-[#1A2E45] hover:bg-[#152639]
                        disabled:opacity-40 text-white text-sm font-semibold transition-colors"
           >
             {saving ? 'Adding…' : 'Add meal'}
           </button>
-        </form>
+        </div>
       </div>
     </div>
   )
