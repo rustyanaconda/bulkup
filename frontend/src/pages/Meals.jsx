@@ -66,7 +66,7 @@ function AddMealModal({ onClose, onAdd }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center"
+      className="fixed inset-0 z-50 flex items-end justify-center pb-16"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
       <div className="absolute inset-0 bg-[#1A2E45]/30" />
