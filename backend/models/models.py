@@ -13,7 +13,7 @@ SQL equivalent of User:
         ...
     );
 """
-from sqlalchemy import Column, Integer, String, Float, Date, Enum, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Float, Date, Enum, ForeignKey, DateTime, Table
 from sqlalchemy.orm import declarative_base, relationship
 from datetime import datetime
 import enum
@@ -51,6 +51,15 @@ class User(Base):
     meal_logs = relationship("MealLog",  back_populates="user")
 
 
+# Many-to-many join table — no model class needed, just a table object
+meal_tags = Table(
+    "meal_tags",
+    Base.metadata,
+    Column("meal_id", Integer, ForeignKey("meals.id"), primary_key=True),
+    Column("tag_id",  Integer, ForeignKey("tags.id"),  primary_key=True),
+)
+
+
 class Meal(Base):
     """
     A meal template — like a recipe card, reused across days.
@@ -71,6 +80,7 @@ class Meal(Base):
 
     user = relationship("User", back_populates="meals")
     logs = relationship("MealLog", back_populates="meal")
+    tags = relationship("Tag", secondary=meal_tags, back_populates="meals")
 
 
 class MealLog(Base):
@@ -111,3 +121,14 @@ class DailyCalories(Base):
     eaten_kcal  = Column(Integer, default=0)       # sum of done meals
     source      = Column(String, default="manual") # 'manual','whoop','oura'
     created_at  = Column(DateTime, default=datetime.utcnow)
+
+
+class Tag(Base):
+    __tablename__ = "tags"
+
+    id       = Column(Integer, primary_key=True, index=True)
+    name     = Column(String,  unique=True, nullable=False)  # e.g. "high protein"
+    slug     = Column(String,  unique=True, nullable=False)  # e.g. "high-protein"
+    tag_type = Column(String,  nullable=False)               # 'primary','restriction','secondary'
+
+    meals = relationship("Meal", secondary=meal_tags, back_populates="tags")
