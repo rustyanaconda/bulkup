@@ -38,9 +38,23 @@ export function useMeals() {
     }
   }
 
-  const eaten   = meals.reduce((sum, m) => m.state === 'done'                              ? sum + m.calories : sum, 0)
-  const planned = meals.reduce((sum, m) => m.state === 'upcoming' || m.state === 'missed'  ? sum + m.calories : sum, 0)
-  const skipped = meals.reduce((sum, m) => m.state === 'skipped'                           ? sum + m.calories : sum, 0)
+  async function addMeal({ name, calories, meal_time }) {
+    const res  = await authFetch('/meals', {
+      method: 'POST',
+      body:   JSON.stringify({ name, calories, meal_time }),
+    })
+    if (!res.ok) {
+      const data = await res.json()
+      throw new Error(data.detail || 'Failed to add meal')
+    }
+    const meal = await res.json()
+    setMeals(prev => [...prev, meal])
+    return meal
+  }
 
-  return { meals, loading, error, updateMealState, eaten, planned, skipped }
+  const eaten   = meals.reduce((sum, m) => m.state === 'done'                             ? sum + m.calories : sum, 0)
+  const planned = meals.reduce((sum, m) => m.state === 'upcoming' || m.state === 'missed' ? sum + m.calories : sum, 0)
+  const skipped = meals.reduce((sum, m) => m.state === 'skipped'                          ? sum + m.calories : sum, 0)
+
+  return { meals, loading, error, updateMealState, addMeal, eaten, planned, skipped }
 }
