@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from datetime import date
 
 from database import get_db
-from models.models import MealLog, Meal, MealState, User
+from models.models import MealLog, Meal, MealState, Tag, User
 from routers.auth import get_current_user
 
 router = APIRouter()
@@ -18,6 +18,7 @@ class MealCreate(BaseModel):
     name:      str
     calories:  int
     meal_time: Literal["breakfast", "lunch", "dinner", "snack"]
+    tag_ids:   list[int] = []
 
 
 class MealStateUpdate(BaseModel):
@@ -40,6 +41,10 @@ def create_meal(
     db.add(meal)
     db.flush()  # assigns meal.id without committing yet
 
+    if body.tag_ids:
+        tags = db.query(Tag).filter(Tag.id.in_(body.tag_ids)).all()
+        meal.tags = tags  # silently drops any ids that don't exist
+
     log = MealLog(
         user_id=user.id,
         meal_id=meal.id,
@@ -49,6 +54,7 @@ def create_meal(
     db.add(log)
     db.commit()
     db.refresh(log)
+    db.refresh(meal)
 
     return {
         "id":        log.id,
@@ -56,6 +62,7 @@ def create_meal(
         "calories":  meal.calories,
         "meal_time": meal.meal_time,
         "state":     log.state.value,
+        "tags":      [{"id": t.id, "name": t.name, "slug": t.slug, "tag_type": t.tag_type} for t in meal.tags],
     }
 
 
@@ -78,10 +85,23 @@ def get_todays_meals(
             "calories":  log.calories_logged if log.calories_logged is not None else meal.calories,
             "meal_time": meal.meal_time,
             "state":     log.state.value,
+            "tags":      [{"id": t.id, "name": t.name, "slug": t.slug, "tag_type": t.tag_type} for t in meal.tags],
         }
         for log, meal in rows
     ]
     return {"meals": meals}
+
+
+@router.get("/tags")
+def get_all_tags(
+    user: User    = Depends(get_current_user),
+    db:   Session = Depends(get_db),
+):
+    tags = db.query(Tag).order_by(Tag.tag_type, Tag.name).all()
+    return [
+        {"id": t.id, "name": t.name, "slug": t.slug, "tag_type": t.tag_type}
+        for t in tags
+    ]
 
 
 @router.patch("/{log_id}/state")
