@@ -36,6 +36,16 @@ TAGS = [
     ("soy-free",         "restriction"),
     ("egg-free",         "restriction"),
 
+    # Allergen — marks what an ingredient CONTAINS (for allergy safety)
+    ("contains egg",      "allergen"),
+    ("contains dairy",    "allergen"),
+    ("contains gluten",   "allergen"),
+    ("contains nuts",     "allergen"),
+    ("contains peanuts",  "allergen"),
+    ("contains soy",      "allergen"),
+    ("contains shellfish","allergen"),
+    ("contains fish",     "allergen"),
+
     # Secondary — hidden, used for filtering/matching only
     ("savory",           "secondary"),
     ("sweet",            "secondary"),
