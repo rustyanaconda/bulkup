@@ -45,7 +45,7 @@ def search_foods(
             json={
                 "query":    query,
                 "pageSize": 15,
-                "dataType": ["Foundation", "SR Legacy", "Survey (FNDDS)"],
+                "dataType": ["SR Legacy", "Survey (FNDDS)"],
             },
             timeout=10,
         )
