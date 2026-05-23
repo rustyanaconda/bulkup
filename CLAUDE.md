@@ -69,3 +69,4 @@ Interactive API docs (test endpoints manually): http://localhost:8000/docs
 `frontend/.env.local`:
 - `VITE_API_URL=http://localhost:8000`
 - `VITE_WHOOP_CLIENT_ID`
+I want you to create a simple version of the
