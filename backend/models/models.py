@@ -78,9 +78,11 @@ class Meal(Base):
     is_smoothie = Column(Integer, default=0)
     is_treat    = Column(Integer, default=0)
 
-    user = relationship("User", back_populates="meals")
-    logs = relationship("MealLog", back_populates="meal")
-    tags = relationship("Tag", secondary=meal_tags, back_populates="meals")
+    user             = relationship("User", back_populates="meals")
+    logs             = relationship("MealLog", back_populates="meal")
+    tags             = relationship("Tag", secondary=meal_tags, back_populates="meals")
+    ingredients_list = relationship("MealIngredient", back_populates="meal",
+                                    cascade="all, delete-orphan")
 
 
 class MealLog(Base):
@@ -121,6 +123,24 @@ class DailyCalories(Base):
     eaten_kcal  = Column(Integer, default=0)       # sum of done meals
     source      = Column(String, default="manual") # 'manual','whoop','oura'
     created_at  = Column(DateTime, default=datetime.utcnow)
+
+
+class MealIngredient(Base):
+    __tablename__ = "meal_ingredients"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    meal_id     = Column(Integer, ForeignKey("meals.id"), nullable=False)
+    fdc_id      = Column(Integer, nullable=False)
+    description = Column(String,  nullable=False)
+    quantity    = Column(Float,   nullable=False)
+    unit        = Column(String,  nullable=False)
+    grams       = Column(Float,   nullable=False)
+    calories    = Column(Float,   nullable=True)
+    protein_g   = Column(Float,   nullable=True)
+    carbs_g     = Column(Float,   nullable=True)
+    fat_g       = Column(Float,   nullable=True)
+
+    meal = relationship("Meal", back_populates="ingredients_list")
 
 
 class Tag(Base):
