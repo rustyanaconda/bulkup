@@ -52,9 +52,23 @@ export function useMeals() {
     return meal
   }
 
+  async function addMealFromIngredients(payload) {
+    const res  = await authFetch('/meals/from-ingredients', {
+      method: 'POST',
+      body:   JSON.stringify(payload),
+    })
+    if (!res.ok) {
+      const data = await res.json()
+      throw new Error(data.detail || 'Failed to add meal')
+    }
+    const meal = await res.json()
+    setMeals(prev => [...prev, meal])
+    return meal
+  }
+
   const eaten   = meals.reduce((sum, m) => m.state === 'done'                             ? sum + m.calories : sum, 0)
   const planned = meals.reduce((sum, m) => m.state === 'upcoming' || m.state === 'missed' ? sum + m.calories : sum, 0)
   const skipped = meals.reduce((sum, m) => m.state === 'skipped'                          ? sum + m.calories : sum, 0)
 
-  return { meals, loading, error, updateMealState, addMeal, eaten, planned, skipped }
+  return { meals, loading, error, updateMealState, addMeal, addMealFromIngredients, eaten, planned, skipped }
 }

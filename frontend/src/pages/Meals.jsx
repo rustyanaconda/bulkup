@@ -221,14 +221,69 @@ function SectionLabel({ children }) {
   )
 }
 
-// ─── add-meal modal (unchanged) ───────────────────────────────────────────────
+// ─── shared tag picker ────────────────────────────────────────────────────────
 
-function AddMealModal({ onClose, onAdd }) {
-  const [form,        setForm]        = useState(EMPTY_FORM)
+function TagPicker({ allTags, selectedIds, onToggle }) {
+  if (allTags.length === 0) return null
+  return (
+    <div className="space-y-3 pt-1 pb-1">
+      {TAG_GROUPS.map(({ label, type }) => {
+        const group = allTags.filter(t => t.tag_type === type)
+        if (group.length === 0) return null
+        return (
+          <div key={type}>
+            <p className="text-xs text-[#A89F88] uppercase tracking-wide font-semibold mb-1.5">
+              {label}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {group.map(tag => {
+                const sel = selectedIds.has(tag.id)
+                return (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => onToggle(tag.id)}
+                    className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors
+                                ${sel
+                                  ? 'bg-[#1A2E45] text-white'
+                                  : 'border border-[#E3DBC9] text-[#6B7B8C] hover:border-[#D4CDB9] bg-transparent'}`}
+                  >
+                    {tag.name}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── add-meal modal ───────────────────────────────────────────────────────────
+
+function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
+  // ── shared ────────────────────────────────────────────────────────────────
+  const [mode,        setMode]        = useState('ingredients')
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState(null)
   const [allTags,     setAllTags]     = useState([])
   const [selectedIds, setSelectedIds] = useState(new Set())
+
+  // ── quick mode ────────────────────────────────────────────────────────────
+  const [qForm, setQForm] = useState(EMPTY_FORM)
+
+  // ── ingredients mode ──────────────────────────────────────────────────────
+  const [ingName,        setIngName]        = useState('')
+  const [ingMealTime,    setIngMealTime]    = useState('breakfast')
+  const [searchQuery,    setSearchQuery]    = useState('')
+  const [searchResults,  setSearchResults]  = useState([])
+  const [isSearching,    setIsSearching]    = useState(false)
+  const [pendingFood,    setPendingFood]    = useState(null)
+  const [isFetchingFood, setIsFetchingFood] = useState(false)
+  const [pendingQty,     setPendingQty]     = useState('1')
+  const [pendingPortion, setPendingPortion] = useState(0)
+  const [ingredients,    setIngredients]    = useState([])
 
   useEffect(() => {
     authFetch('/meals/tags')
@@ -237,9 +292,20 @@ function AddMealModal({ onClose, onAdd }) {
       .catch(() => {})
   }, [])
 
-  function setField(field, value) {
-    setForm(prev => ({ ...prev, [field]: value }))
-  }
+  // debounced food search — only fires when there's no pendingFood
+  useEffect(() => {
+    const q = searchQuery.trim()
+    if (!q || pendingFood) return
+    const timer = setTimeout(() => {
+      setIsSearching(true)
+      authFetch(`/foods/search?query=${encodeURIComponent(q)}`)
+        .then(r => r.json())
+        .then(data => setSearchResults(Array.isArray(data) ? data : []))
+        .catch(() => setSearchResults([]))
+        .finally(() => setIsSearching(false))
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [searchQuery, pendingFood])
 
   function toggleTag(id) {
     setSelectedIds(prev => {
@@ -249,15 +315,77 @@ function AddMealModal({ onClose, onAdd }) {
     })
   }
 
-  async function handleSubmit(e) {
+  // ── ingredient search helpers ─────────────────────────────────────────────
+
+  async function selectSearchResult(food) {
+    setSearchResults([])
+    setSearchQuery(food.description)
+    setIsFetchingFood(true)
+    setPendingFood(null)
+    try {
+      const res  = await authFetch(`/foods/${food.fdc_id}`)
+      const data = await res.json()
+      setPendingFood(data)
+      setPendingQty('1')
+      setPendingPortion(0)
+    } catch {
+      setError('Could not load food details')
+    } finally {
+      setIsFetchingFood(false)
+    }
+  }
+
+  function cancelPendingFood() {
+    setPendingFood(null)
+    setSearchQuery('')
+    setSearchResults([])
+  }
+
+  function confirmAddIngredient() {
+    if (!pendingFood) return
+    const portion = pendingFood.portions[pendingPortion]
+    setIngredients(prev => [...prev, {
+      fdc_id:      pendingFood.fdc_id,
+      description: pendingFood.description,
+      per_100g: {
+        calories:  pendingFood.calories,
+        protein_g: pendingFood.protein_g,
+        carbs_g:   pendingFood.carbs_g,
+        fat_g:     pendingFood.fat_g,
+      },
+      quantity:    parseFloat(pendingQty) || 1,
+      unit:        portion.label,
+      gram_weight: portion.gram_weight,
+    }])
+    setPendingFood(null)
+    setSearchQuery('')
+  }
+
+  function removeIngredient(idx) {
+    setIngredients(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  function calcIngCals(ing) {
+    if (!ing.per_100g?.calories) return 0
+    return Math.round(ing.per_100g.calories * (ing.quantity * ing.gram_weight) / 100)
+  }
+
+  const totalCals    = Math.round(ingredients.reduce((s, i) => s + (i.per_100g?.calories  ?? 0) * (i.quantity * i.gram_weight) / 100, 0))
+  const totalProtein = Math.round(ingredients.reduce((s, i) => s + (i.per_100g?.protein_g ?? 0) * (i.quantity * i.gram_weight) / 100, 0) * 10) / 10
+  const totalCarbs   = Math.round(ingredients.reduce((s, i) => s + (i.per_100g?.carbs_g   ?? 0) * (i.quantity * i.gram_weight) / 100, 0) * 10) / 10
+  const totalFat     = Math.round(ingredients.reduce((s, i) => s + (i.per_100g?.fat_g     ?? 0) * (i.quantity * i.gram_weight) / 100, 0) * 10) / 10
+
+  // ── submit handlers ───────────────────────────────────────────────────────
+
+  async function handleQuickSubmit(e) {
     e.preventDefault()
     setError(null)
     setSaving(true)
     try {
-      await onAdd({
-        name:      form.name.trim(),
-        calories:  parseInt(form.calories, 10),
-        meal_time: form.meal_time,
+      await onAddMeal({
+        name:      qForm.name.trim(),
+        calories:  parseInt(qForm.calories, 10),
+        meal_time: qForm.meal_time,
         tag_ids:   [...selectedIds],
       })
       onClose()
@@ -267,6 +395,37 @@ function AddMealModal({ onClose, onAdd }) {
       setSaving(false)
     }
   }
+
+  async function handleIngredientsSubmit(e) {
+    e.preventDefault()
+    if (ingredients.length === 0) { setError('Add at least one ingredient'); return }
+    setError(null)
+    setSaving(true)
+    try {
+      await onAddFromIngredients({
+        name:        ingName.trim(),
+        meal_time:   ingMealTime,
+        tag_ids:     [...selectedIds],
+        ingredients: ingredients.map(ing => ({
+          fdc_id:      ing.fdc_id,
+          description: ing.description,
+          per_100g:    ing.per_100g,
+          quantity:    ing.quantity,
+          unit:        ing.unit,
+          gram_weight: ing.gram_weight,
+        })),
+      })
+      onClose()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const canSubmit = mode === 'quick'
+    ? (!!qForm.name.trim() && !!qForm.calories)
+    : (!!ingName.trim() && ingredients.length > 0)
 
   const inputClass = `w-full bg-[#F5EFE0] border border-[#E3DBC9] rounded-xl px-3 py-2.5
                       text-sm text-[#1A2E45] placeholder-[#A89F88] focus:outline-none
@@ -284,7 +443,7 @@ function AddMealModal({ onClose, onAdd }) {
                       flex flex-col max-h-[85vh]">
 
         {/* Fixed header */}
-        <div className="flex items-center justify-between px-6 pt-6 pb-4 flex-shrink-0">
+        <div className="flex items-center justify-between px-6 pt-6 pb-3 flex-shrink-0">
           <h2 className="text-base font-bold text-[#1A2E45]">Add meal</h2>
           <button
             onClick={onClose}
@@ -296,107 +455,310 @@ function AddMealModal({ onClose, onAdd }) {
           </button>
         </div>
 
-        {/* Scrollable body */}
-        <form
-          id="add-meal-form"
-          onSubmit={handleSubmit}
-          className="flex-1 overflow-y-auto px-6 space-y-4 pb-2"
-        >
-          <div>
-            <label className="block text-xs text-[#6B7B8C] uppercase tracking-wide font-semibold mb-1.5">
-              Meal name
-            </label>
-            <input
-              type="text"
-              required
-              autoFocus
-              value={form.name}
-              onChange={e => setField('name', e.target.value)}
-              placeholder="e.g. Salmon rice bowl"
-              className={inputClass}
-            />
+        {/* Mode toggle */}
+        <div className="px-6 pb-3 flex-shrink-0">
+          <div className="flex bg-[#F5EFE0] rounded-xl p-0.5">
+            {[['ingredients', 'Ingredients'], ['quick', 'Quick']].map(([m, label]) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => { setMode(m); setError(null) }}
+                className={`flex-1 py-1.5 text-sm font-semibold rounded-[10px] transition-colors
+                            ${mode === m
+                              ? 'bg-white text-[#1A2E45] shadow-sm'
+                              : 'text-[#A89F88] hover:text-[#6B7B8C]'}`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
+        </div>
 
-          <div className="flex gap-3">
-            <div className="flex-1">
+        {/* ── Quick mode body ── */}
+        {mode === 'quick' && (
+          <form
+            id="meal-form"
+            onSubmit={handleQuickSubmit}
+            className="flex-1 overflow-y-auto px-6 space-y-4 pb-2"
+          >
+            <div>
               <label className="block text-xs text-[#6B7B8C] uppercase tracking-wide font-semibold mb-1.5">
-                Calories
+                Meal name
               </label>
               <input
-                type="number"
+                type="text"
                 required
-                min="1"
-                max="9999"
-                value={form.calories}
-                onChange={e => setField('calories', e.target.value)}
-                placeholder="650"
+                autoFocus
+                value={qForm.name}
+                onChange={e => setQForm(p => ({ ...p, name: e.target.value }))}
+                placeholder="e.g. Salmon rice bowl"
                 className={inputClass}
               />
             </div>
 
-            <div className="flex-1">
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <label className="block text-xs text-[#6B7B8C] uppercase tracking-wide font-semibold mb-1.5">
+                  Calories
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  max="9999"
+                  value={qForm.calories}
+                  onChange={e => setQForm(p => ({ ...p, calories: e.target.value }))}
+                  placeholder="650"
+                  className={inputClass}
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs text-[#6B7B8C] uppercase tracking-wide font-semibold mb-1.5">
+                  Meal time
+                </label>
+                <select
+                  value={qForm.meal_time}
+                  onChange={e => setQForm(p => ({ ...p, meal_time: e.target.value }))}
+                  className={`${inputClass} capitalize`}
+                >
+                  {MEAL_TIMES.map(t => (
+                    <option key={t} value={t} className="capitalize">{t}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <TagPicker allTags={allTags} selectedIds={selectedIds} onToggle={toggleTag} />
+
+            {error && (
+              <p className="text-sm text-[#A32D2D] bg-[#A32D2D]/10 rounded-xl px-3 py-2">
+                {error}
+              </p>
+            )}
+          </form>
+        )}
+
+        {/* ── Ingredients mode body ── */}
+        {mode === 'ingredients' && (
+          <form
+            id="meal-form"
+            onSubmit={handleIngredientsSubmit}
+            className="flex-1 overflow-y-auto px-6 space-y-4 pb-2"
+          >
+            {/* Meal name + time */}
+            <div className="flex gap-3">
+              <div className="flex-[2]">
+                <label className="block text-xs text-[#6B7B8C] uppercase tracking-wide font-semibold mb-1.5">
+                  Meal name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={ingName}
+                  onChange={e => setIngName(e.target.value)}
+                  placeholder="e.g. Scrambled eggs"
+                  className={inputClass}
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs text-[#6B7B8C] uppercase tracking-wide font-semibold mb-1.5">
+                  Time
+                </label>
+                <select
+                  value={ingMealTime}
+                  onChange={e => setIngMealTime(e.target.value)}
+                  className={`${inputClass} capitalize`}
+                >
+                  {MEAL_TIMES.map(t => (
+                    <option key={t} value={t} className="capitalize">{t}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Food search */}
+            <div>
               <label className="block text-xs text-[#6B7B8C] uppercase tracking-wide font-semibold mb-1.5">
-                Meal time
+                Search ingredients
               </label>
-              <select
-                value={form.meal_time}
-                onChange={e => setField('meal_time', e.target.value)}
-                className={`${inputClass} capitalize`}
-              >
-                {MEAL_TIMES.map(t => (
-                  <option key={t} value={t} className="capitalize">{t}</option>
-                ))}
-              </select>
-            </div>
-          </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => {
+                    setSearchQuery(e.target.value)
+                    if (pendingFood) { setPendingFood(null); setSearchResults([]) }
+                  }}
+                  placeholder="e.g. eggs, chicken breast…"
+                  className={inputClass}
+                />
+                {(isSearching || isFetchingFood) && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A89F88] text-xs">
+                    …
+                  </span>
+                )}
+              </div>
 
-          {allTags.length > 0 && (
-            <div className="space-y-3 pt-1 pb-1">
-              {TAG_GROUPS.map(({ label, type }) => {
-                const group = allTags.filter(t => t.tag_type === type)
-                if (group.length === 0) return null
-                return (
-                  <div key={type}>
-                    <p className="text-xs text-[#A89F88] uppercase tracking-wide font-semibold mb-1.5">
-                      {label}
+              {/* Search results dropdown */}
+              {searchResults.length > 0 && !pendingFood && (
+                <div className="mt-1 bg-[#F5EFE0] rounded-xl border border-[#E3DBC9]
+                                overflow-hidden max-h-44 overflow-y-auto">
+                  {searchResults.map(food => (
+                    <button
+                      key={food.fdc_id}
+                      type="button"
+                      onClick={() => selectSearchResult(food)}
+                      className="w-full flex items-center justify-between px-3 py-2.5
+                                 text-left hover:bg-[#EFE8D8] transition-colors
+                                 border-b border-[#E3DBC9] last:border-b-0"
+                    >
+                      <span className="text-sm text-[#1A2E45] truncate pr-2 flex-1">
+                        {food.description}
+                      </span>
+                      <span className="text-xs text-[#A89F88] flex-shrink-0">
+                        {food.calories != null ? `${Math.round(food.calories)} kcal` : '—'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Portion picker — shown when a food is selected */}
+            {pendingFood && (
+              <div className="bg-[#F5EFE0] rounded-2xl border border-[#E3DBC9] p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-[10px] text-[#A89F88] font-semibold uppercase tracking-wide">
+                      Adding
                     </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {group.map(tag => {
-                        const selected = selectedIds.has(tag.id)
-                        return (
-                          <button
-                            key={tag.id}
-                            type="button"
-                            onClick={() => toggleTag(tag.id)}
-                            className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors
-                                        ${selected
-                                          ? 'bg-[#1A2E45] text-white'
-                                          : 'border border-[#E3DBC9] text-[#6B7B8C] hover:border-[#D4CDB9] bg-transparent'}`}
-                          >
-                            {tag.name}
-                          </button>
-                        )
-                      })}
-                    </div>
+                    <p className="text-sm font-semibold text-[#1A2E45] mt-0.5 leading-snug">
+                      {pendingFood.description}
+                    </p>
                   </div>
-                )
-              })}
-            </div>
-          )}
+                  <button
+                    type="button"
+                    onClick={cancelPendingFood}
+                    className="text-[#A89F88] hover:text-[#6B7B8C] text-xs flex-shrink-0 mt-0.5"
+                  >
+                    ✕
+                  </button>
+                </div>
 
-          {error && (
-            <p className="text-sm text-[#A32D2D] bg-[#A32D2D]/10 rounded-xl px-3 py-2">
-              {error}
-            </p>
-          )}
-        </form>
+                <div className="flex gap-2">
+                  <div className="w-20 flex-shrink-0">
+                    <label className="block text-xs text-[#6B7B8C] font-semibold mb-1">Qty</label>
+                    <input
+                      type="number"
+                      min="0.1"
+                      step="0.1"
+                      value={pendingQty}
+                      onChange={e => setPendingQty(e.target.value)}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs text-[#6B7B8C] font-semibold mb-1">Portion</label>
+                    <select
+                      value={pendingPortion}
+                      onChange={e => setPendingPortion(Number(e.target.value))}
+                      className={inputClass}
+                    >
+                      {pendingFood.portions.map((p, i) => (
+                        <option key={i} value={i}>{p.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Live calorie preview */}
+                {(() => {
+                  const portion = pendingFood.portions[pendingPortion]
+                  const grams   = (parseFloat(pendingQty) || 0) * portion.gram_weight
+                  const cals    = pendingFood.calories != null
+                    ? Math.round(pendingFood.calories * grams / 100) : null
+                  return cals != null ? (
+                    <p className="text-xs text-[#6B7B8C]">
+                      ≈ {Math.round(grams)}g · {cals} kcal
+                    </p>
+                  ) : null
+                })()}
+
+                <button
+                  type="button"
+                  onClick={confirmAddIngredient}
+                  className="w-full py-2 rounded-xl bg-[#1A2E45] hover:bg-[#152639]
+                             text-white text-sm font-semibold transition-colors"
+                >
+                  + Add ingredient
+                </button>
+              </div>
+            )}
+
+            {/* Selected ingredient list */}
+            {ingredients.length > 0 && (
+              <div>
+                <p className="text-xs text-[#A89F88] uppercase tracking-wide font-semibold mb-2">
+                  Ingredients ({ingredients.length})
+                </p>
+                <div className="space-y-1.5">
+                  {ingredients.map((ing, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2 bg-[#F5EFE0] rounded-xl
+                                 px-3 py-2.5 border border-[#E3DBC9]"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-semibold text-[#1A2E45] truncate">
+                          {ing.quantity} {ing.unit}
+                        </div>
+                        <div className="text-xs text-[#6B7B8C] truncate">{ing.description}</div>
+                      </div>
+                      <span className="text-xs text-[#6B7B8C] font-medium flex-shrink-0">
+                        {calcIngCals(ing)} cal
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeIngredient(idx)}
+                        className="w-5 h-5 flex items-center justify-center rounded-full
+                                   bg-[#E3DBC9] text-[#A89F88] hover:bg-[#D4CDB9]
+                                   text-[10px] font-bold flex-shrink-0 transition-colors"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Running totals */}
+                <div className="mt-2.5 bg-[#1A2E45]/5 rounded-xl px-3 py-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-[#1A2E45]">Total</span>
+                    <span className="text-sm font-bold text-[#1A2E45]">{totalCals} kcal</span>
+                  </div>
+                  <p className="text-xs text-[#6B7B8C] mt-0.5">
+                    {totalProtein}g protein · {totalCarbs}g carbs · {totalFat}g fat
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <TagPicker allTags={allTags} selectedIds={selectedIds} onToggle={toggleTag} />
+
+            {error && (
+              <p className="text-sm text-[#A32D2D] bg-[#A32D2D]/10 rounded-xl px-3 py-2">
+                {error}
+              </p>
+            )}
+          </form>
+        )}
 
         {/* Fixed footer */}
         <div className="px-6 pt-3 pb-6 flex-shrink-0 border-t border-[#E3DBC9]">
           <button
             type="submit"
-            form="add-meal-form"
-            disabled={saving || !form.name.trim() || !form.calories}
+            form="meal-form"
+            disabled={saving || !canSubmit}
             className="w-full py-3 rounded-xl bg-[#1A2E45] hover:bg-[#152639]
                        disabled:opacity-40 text-white text-sm font-semibold transition-colors"
           >
@@ -411,7 +773,7 @@ function AddMealModal({ onClose, onAdd }) {
 // ─── main page ────────────────────────────────────────────────────────────────
 
 export default function Meals() {
-  const { meals, loading, error, updateMealState, addMeal, eaten, planned } = useMeals()
+  const { meals, loading, error, updateMealState, addMeal, addMealFromIngredients, eaten, planned } = useMeals()
   const { target } = useCalories()
   const [showModal, setShowModal] = useState(false)
 
@@ -501,7 +863,8 @@ export default function Meals() {
       {showModal && (
         <AddMealModal
           onClose={() => setShowModal(false)}
-          onAdd={addMeal}
+          onAddMeal={addMeal}
+          onAddFromIngredients={addMealFromIngredients}
         />
       )}
     </div>
