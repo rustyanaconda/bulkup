@@ -143,6 +143,73 @@ class MealIngredient(Base):
     meal = relationship("Meal", back_populates="ingredients_list")
 
 
+food_tags = Table(
+    "food_tags",
+    Base.metadata,
+    Column("food_id", Integer, ForeignKey("foods.id"), primary_key=True),
+    Column("tag_id",  Integer, ForeignKey("tags.id"),  primary_key=True),
+)
+
+
+class Food(Base):
+    __tablename__ = "foods"
+
+    id       = Column(Integer, primary_key=True, index=True)
+    name     = Column(String,  nullable=False, index=True)
+    category = Column(String,  nullable=True)   # protein, grain, vegetable, fruit, dairy, fat, other
+    fdc_id   = Column(Integer, nullable=True)   # USDA source id
+    source   = Column(String,  default="manual") # 'usda' or 'manual'
+
+    # Macros per 100g
+    calories        = Column(Float, nullable=True)
+    protein_g       = Column(Float, nullable=True)
+    carbs_g         = Column(Float, nullable=True)
+    fat_g           = Column(Float, nullable=True)
+    fiber_g         = Column(Float, nullable=True)
+    sugar_g         = Column(Float, nullable=True)
+    saturated_fat_g = Column(Float, nullable=True)
+
+    # Micronutrients per 100g
+    sodium_mg       = Column(Float, nullable=True)
+    potassium_mg    = Column(Float, nullable=True)
+    calcium_mg      = Column(Float, nullable=True)
+    iron_mg         = Column(Float, nullable=True)
+    magnesium_mg    = Column(Float, nullable=True)
+    zinc_mg         = Column(Float, nullable=True)
+    phosphorus_mg   = Column(Float, nullable=True)
+    copper_mg       = Column(Float, nullable=True)
+    manganese_mg    = Column(Float, nullable=True)
+    selenium_ug     = Column(Float, nullable=True)
+    vitamin_a_ug    = Column(Float, nullable=True)
+    vitamin_c_mg    = Column(Float, nullable=True)
+    vitamin_d_ug    = Column(Float, nullable=True)
+    vitamin_e_mg    = Column(Float, nullable=True)
+    vitamin_k_ug    = Column(Float, nullable=True)
+    thiamin_mg      = Column(Float, nullable=True)
+    riboflavin_mg   = Column(Float, nullable=True)
+    niacin_mg       = Column(Float, nullable=True)
+    vitamin_b6_mg   = Column(Float, nullable=True)
+    folate_ug       = Column(Float, nullable=True)
+    vitamin_b12_ug  = Column(Float, nullable=True)
+    cholesterol_mg  = Column(Float, nullable=True)
+
+    portions = relationship("FoodPortion", back_populates="food",
+                            cascade="all, delete-orphan")
+    tags     = relationship("Tag", secondary=food_tags, back_populates="foods")
+
+
+class FoodPortion(Base):
+    __tablename__ = "food_portions"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    food_id    = Column(Integer, ForeignKey("foods.id"), nullable=False)
+    label      = Column(String,  nullable=False)  # e.g. "1 large egg", "1 cup cooked", "grams"
+    grams      = Column(Float,   nullable=False)  # gram weight of this portion
+    is_default = Column(Integer, default=0)       # 1 = shown first
+
+    food = relationship("Food", back_populates="portions")
+
+
 class Tag(Base):
     __tablename__ = "tags"
 
@@ -152,3 +219,4 @@ class Tag(Base):
     tag_type = Column(String,  nullable=False)               # 'primary','restriction','secondary'
 
     meals = relationship("Meal", secondary=meal_tags, back_populates="tags")
+    foods = relationship("Food", secondary=food_tags, back_populates="tags")
