@@ -10,7 +10,6 @@ from routers.auth import get_current_user
 router = APIRouter()
 
 USDA_SEARCH_URL = "https://api.nal.usda.gov/fdc/v1/foods/search"
-DATA_TYPES       = "Foundation,SR Legacy,Survey (FNDDS)"
 
 NUTRIENT_FIELDS = {
     "208": "calories",
@@ -39,13 +38,13 @@ def search_foods(
         raise HTTPException(status_code=503, detail="USDA API key not configured")
 
     try:
-        resp = httpx.get(
+        resp = httpx.post(
             USDA_SEARCH_URL,
-            params={
+            params={"api_key": api_key},
+            json={
                 "query":    query,
-                "api_key":  api_key,
                 "pageSize": 15,
-                "dataType": DATA_TYPES,
+                "dataType": ["Foundation", "SR Legacy", "Survey (FNDDS)"],
             },
             timeout=10,
         )
@@ -53,9 +52,13 @@ def search_foods(
         raise HTTPException(status_code=502, detail=f"USDA API unreachable: {exc}")
 
     if resp.status_code != 200:
+        try:
+            usda_detail = resp.json()
+        except Exception:
+            usda_detail = resp.text
         raise HTTPException(
             status_code=502,
-            detail=f"USDA API error {resp.status_code}",
+            detail=f"USDA API error {resp.status_code}: {usda_detail}",
         )
 
     body = resp.json()
