@@ -21,11 +21,22 @@ NUTRIENT_FIELDS = {
 
 
 def _extract_nutrients(food_nutrients: list) -> dict:
+    """Search endpoint: nutrientNumber / value"""
     result = {v: None for v in NUTRIENT_FIELDS.values()}
     for n in food_nutrients:
         num = str(n.get("nutrientNumber", ""))
         if num in NUTRIENT_FIELDS:
             result[NUTRIENT_FIELDS[num]] = n.get("value")
+    return result
+
+
+def _extract_nutrients_detail(food_nutrients: list) -> dict:
+    """Detail endpoint: nutrient.number / amount"""
+    result = {v: None for v in NUTRIENT_FIELDS.values()}
+    for n in food_nutrients:
+        num = str((n.get("nutrient") or {}).get("number", ""))
+        if num in NUTRIENT_FIELDS:
+            result[NUTRIENT_FIELDS[num]] = n.get("amount")
     return result
 
 
@@ -144,6 +155,6 @@ def get_food(
         "fdc_id":      food.get("fdcId"),
         "description": food.get("description"),
         "data_type":   food.get("dataType"),
-        **_extract_nutrients(food.get("foodNutrients", [])),
+        **_extract_nutrients_detail(food.get("foodNutrients", [])),
         "portions":    portions,
     }
