@@ -280,7 +280,6 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
   const [searchResults,  setSearchResults]  = useState([])
   const [isSearching,    setIsSearching]    = useState(false)
   const [pendingFood,    setPendingFood]    = useState(null)
-  const [isFetchingFood, setIsFetchingFood] = useState(false)
   const [pendingQty,     setPendingQty]     = useState('1')
   const [pendingPortion, setPendingPortion] = useState(0)
   const [ingredients,    setIngredients]    = useState([])
@@ -292,13 +291,13 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
       .catch(() => {})
   }, [])
 
-  // debounced food search — only fires when there's no pendingFood
+  // debounced curated food search — only fires when there's no pendingFood
   useEffect(() => {
     const q = searchQuery.trim()
     if (!q || pendingFood) return
     const timer = setTimeout(() => {
       setIsSearching(true)
-      authFetch(`/foods/search?query=${encodeURIComponent(q)}`)
+      authFetch(`/foods/curated/search?query=${encodeURIComponent(q)}`)
         .then(r => r.json())
         .then(data => setSearchResults(Array.isArray(data) ? data : []))
         .catch(() => setSearchResults([]))
@@ -317,22 +316,14 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
 
   // ── ingredient search helpers ─────────────────────────────────────────────
 
-  async function selectSearchResult(food) {
+  function selectSearchResult(food) {
     setSearchResults([])
-    setSearchQuery(food.description)
-    setIsFetchingFood(true)
-    setPendingFood(null)
-    try {
-      const res  = await authFetch(`/foods/${food.fdc_id}`)
-      const data = await res.json()
-      setPendingFood(data)
-      setPendingQty('1')
-      setPendingPortion(0)
-    } catch {
-      setError('Could not load food details')
-    } finally {
-      setIsFetchingFood(false)
-    }
+    setSearchQuery(food.name)
+    // Curated results include portions inline — no separate fetch needed
+    const defaultIdx = food.portions.findIndex(p => p.is_default)
+    setPendingFood(food)
+    setPendingQty('1')
+    setPendingPortion(defaultIdx >= 0 ? defaultIdx : 0)
   }
 
   function cancelPendingFood() {
@@ -346,7 +337,7 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
     const portion = pendingFood.portions[pendingPortion]
     setIngredients(prev => [...prev, {
       fdc_id:      pendingFood.fdc_id,
-      description: pendingFood.description,
+      description: pendingFood.name,
       per_100g: {
         calories:  pendingFood.calories,
         protein_g: pendingFood.protein_g,
@@ -355,7 +346,7 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
       },
       quantity:    parseFloat(pendingQty) || 1,
       unit:        portion.label,
-      gram_weight: portion.gram_weight,
+      gram_weight: portion.grams,        // curated portions use "grams", not "gram_weight"
     }])
     setPendingFood(null)
     setSearchQuery('')
@@ -592,7 +583,7 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
                   placeholder="e.g. eggs, chicken breast…"
                   className={inputClass}
                 />
-                {(isSearching || isFetchingFood) && (
+                {isSearching && (
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A89F88] text-xs">
                     …
                   </span>
@@ -605,7 +596,7 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
                                 overflow-hidden max-h-44 overflow-y-auto">
                   {searchResults.map(food => (
                     <button
-                      key={food.fdc_id}
+                      key={food.id}
                       type="button"
                       onClick={() => selectSearchResult(food)}
                       className="w-full flex items-center justify-between px-3 py-2.5
@@ -613,7 +604,7 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
                                  border-b border-[#E3DBC9] last:border-b-0"
                     >
                       <span className="text-sm text-[#1A2E45] truncate pr-2 flex-1">
-                        {food.description}
+                        {food.name}
                       </span>
                       <span className="text-xs text-[#A89F88] flex-shrink-0">
                         {food.calories != null ? `${Math.round(food.calories)} kcal` : '—'}
@@ -633,7 +624,7 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
                       Adding
                     </p>
                     <p className="text-sm font-semibold text-[#1A2E45] mt-0.5 leading-snug">
-                      {pendingFood.description}
+                      {pendingFood.name}
                     </p>
                   </div>
                   <button
@@ -674,7 +665,7 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
                 {/* Live calorie preview */}
                 {(() => {
                   const portion = pendingFood.portions[pendingPortion]
-                  const grams   = (parseFloat(pendingQty) || 0) * portion.gram_weight
+                  const grams   = (parseFloat(pendingQty) || 0) * portion.grams
                   const cals    = pendingFood.calories != null
                     ? Math.round(pendingFood.calories * grams / 100) : null
                   return cals != null ? (
