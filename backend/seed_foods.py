@@ -1,16 +1,22 @@
 """
 Seed curated whole foods from USDA into the foods + food_portions tables.
-Idempotent: matches by fdc_id, updates if present, inserts if not.
-Portions are replaced on every run.
+
+Default behavior (insert-only): skips foods that already exist in the DB.
+Only new fdc_ids trigger USDA API calls, making normal runs fast.
+
+Force-refresh mode (--force or --refresh): re-fetches nutrition from USDA
+and updates ALL foods, replacing their portions. Use when refreshing data.
 
 Usage:
     cd backend
     source venv/bin/activate
-    python seed_foods.py
+    python seed_foods.py              # insert new foods only
+    python seed_foods.py --force      # re-fetch and update all foods
 """
 import os
 import sys
 import time
+import argparse
 sys.path.insert(0, os.path.dirname(__file__))
 
 from dotenv import load_dotenv
@@ -239,12 +245,13 @@ def apply_nutrition(food_obj: Food, nutrition: dict) -> None:
         setattr(food_obj, col, val)
 
 
-def seed() -> None:
+def seed(force: bool = False) -> None:
     db = next(get_db())
     try:
         inserted = 0
         updated  = 0
         skipped  = 0
+        errors   = 0
 
         for entry in CURATED_FOODS:
             name       = entry["name"]
@@ -253,25 +260,31 @@ def seed() -> None:
             queries    = entry["queries"]
             portions   = entry["portions"]
 
+            food_row = db.query(Food).filter(Food.fdc_id == fdc_id).first()
+
+            # ── Default mode: skip existing foods entirely ────────────────
+            if food_row and not force:
+                print(f"── {name}  (fdc_id={fdc_id})  skipped (already exists)")
+                skipped += 1
+                continue
+
             print(f"\n── {name}  (fdc_id={fdc_id})")
 
-            # ── 1. Fetch nutrition from USDA ──────────────────────────────
+            # ── Fetch nutrition from USDA ─────────────────────────────────
             usda_food = search_for_fdc_id(fdc_id, queries)
 
             if usda_food is None:
                 print(f"   WARNING: fdc_id {fdc_id} not found in any search result — skipping.")
-                skipped += 1
+                errors += 1
                 continue
 
-            nutrition    = extract_nutrition(usda_food.get("foodNutrients", []))
-            n_populated  = len(nutrition)
-            cal          = nutrition.get("calories")
+            nutrition   = extract_nutrition(usda_food.get("foodNutrients", []))
+            cal         = nutrition.get("calories")
+            n_populated = len(nutrition)
             print(f"   matched: {usda_food.get('description')}")
             print(f"   calories={cal}  nutrients populated: {n_populated}/{len(NUTRIENT_MAP)}")
 
-            # ── 2. Upsert Food row ────────────────────────────────────────
-            food_row = db.query(Food).filter(Food.fdc_id == fdc_id).first()
-
+            # ── Upsert Food row ───────────────────────────────────────────
             if food_row:
                 food_row.name     = name
                 food_row.category = category
@@ -290,7 +303,7 @@ def seed() -> None:
 
             db.flush()  # ensure food_row.id is assigned
 
-            # ── 3. Replace portions ───────────────────────────────────────
+            # ── Replace portions ──────────────────────────────────────────
             db.query(FoodPortion).filter(FoodPortion.food_id == food_row.id).delete()
 
             all_portions = list(portions) + [("grams", 1, 0)]
@@ -306,11 +319,22 @@ def seed() -> None:
             print(f"   {action}  |  {len(all_portions)} portions added")
 
         print(f"\n{'─' * 50}")
-        print(f"Done — {inserted} inserted, {updated} updated, {skipped} skipped.")
+        if force:
+            print(f"Done — {inserted} inserted, {updated} updated, {errors} errors.")
+        else:
+            print(f"Done — {inserted} inserted, {skipped} skipped (already existed), {errors} errors.")
 
     finally:
         db.close()
 
 
 if __name__ == "__main__":
-    seed()
+    parser = argparse.ArgumentParser(description="Seed curated foods into the database.")
+    parser.add_argument(
+        "--force", "--refresh",
+        action="store_true",
+        dest="force",
+        help="Re-fetch and update ALL foods from USDA, even existing ones.",
+    )
+    args = parser.parse_args()
+    seed(force=args.force)
