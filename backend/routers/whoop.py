@@ -115,8 +115,10 @@ async def whoop_webhook(request: Request):
 
     event_type = payload.get("type") if isinstance(payload, dict) else "unknown"
 
-    logger.info("Whoop webhook received  event_type=%s", event_type)
-    logger.info("Whoop webhook headers:  %s", headers)
-    logger.info("Whoop webhook payload:  %s", payload)
+    print("=== WHOOP WEBHOOK RECEIVED ===", flush=True)
+    print(f"EVENT TYPE: {event_type}", flush=True)
+    print(f"HEADERS: {headers}", flush=True)
+    print(f"PAYLOAD: {payload}", flush=True)
+    print("==============================", flush=True)
 
     return {"received": True}
