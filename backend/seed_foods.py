@@ -157,6 +157,41 @@ CURATED_FOODS = [
         "queries": ["chocolate milk", "milk chocolate lowfat"],
         "portions": [("1 cup", 250, 1)],
     },
+    {
+        "name": "Plain bagel", "category": "grain", "fdc_id": 174899,
+        "queries": ["bagels plain enriched", "bagels plain"],
+        "portions": [("1 bagel", 98, 1), ("1 large bagel", 131, 0), ("1 mini bagel", 26, 0)],
+    },
+    {
+        "name": "Egg bagel", "category": "grain", "fdc_id": 174901,
+        "queries": ["bagels egg", "bagels, egg"],
+        "portions": [("1 bagel", 98, 1), ("1 large bagel", 131, 0), ("1 mini bagel", 26, 0)],
+    },
+    {
+        "name": "Whole wheat bagel", "category": "grain", "fdc_id": 167533,
+        "queries": ["bagels wheat", "bagels, oat bran"],
+        "portions": [("1 bagel", 98, 1), ("1 large bagel", 131, 0), ("1 mini bagel", 26, 0)],
+    },
+    {
+        "name": "White bread", "category": "grain", "fdc_id": 174924,
+        "queries": ["bread white commercially prepared", "bread white"],
+        "portions": [("1 slice", 28, 1), ("2 slices", 56, 0)],
+    },
+    {
+        "name": "Whole wheat bread", "category": "grain", "fdc_id": 172688,
+        "queries": ["bread whole wheat commercially prepared", "bread whole-wheat"],
+        "portions": [("1 slice", 28, 1), ("2 slices", 56, 0)],
+    },
+    {
+        "name": "Sourdough bread", "category": "grain", "fdc_id": 172675,
+        "queries": ["bread french or vienna sourdough", "bread, sourdough"],
+        "portions": [("1 slice", 28, 1), ("2 slices", 56, 0)],
+    },
+    {
+        "name": "Multigrain bread", "category": "grain", "fdc_id": 168013,
+        "queries": ["bread multi-grain", "bread, multigrain"],
+        "portions": [("1 slice", 28, 1), ("2 slices", 56, 0)],
+    },
 ]
 
 
