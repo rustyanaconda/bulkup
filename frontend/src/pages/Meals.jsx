@@ -279,10 +279,11 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
   const [searchQuery,    setSearchQuery]    = useState('')
   const [searchResults,  setSearchResults]  = useState([])
   const [isSearching,    setIsSearching]    = useState(false)
-  const [pendingFood,    setPendingFood]    = useState(null)
-  const [pendingQty,     setPendingQty]     = useState('1')
-  const [pendingPortion, setPendingPortion] = useState(0)
-  const [ingredients,    setIngredients]    = useState([])
+  const [pendingFood,          setPendingFood]          = useState(null)
+  const [pendingQty,           setPendingQty]           = useState('1')
+  const [pendingPortion,       setPendingPortion]       = useState(0)
+  const [ingredients,          setIngredients]          = useState([])
+  const [showIngredientSearch, setShowIngredientSearch] = useState(false)
 
   useEffect(() => {
     authFetch('/meals/tags')
@@ -326,7 +327,8 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
     setPendingPortion(defaultIdx >= 0 ? defaultIdx : 0)
   }
 
-  function cancelPendingFood() {
+  function closeSearch() {
+    setShowIngredientSearch(false)
     setPendingFood(null)
     setSearchQuery('')
     setSearchResults([])
@@ -346,10 +348,13 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
       },
       quantity:    parseFloat(pendingQty) || 1,
       unit:        portion.label,
-      gram_weight: portion.grams,        // curated portions use "grams", not "gram_weight"
+      gram_weight: portion.grams,
     }])
+    // Collapse search panel after adding — user sees updated list with dashed button
+    setShowIngredientSearch(false)
     setPendingFood(null)
     setSearchQuery('')
+    setSearchResults([])
   }
 
   function removeIngredient(idx) {
@@ -567,170 +572,193 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
               </div>
             </div>
 
-            {/* Food search */}
-            <div>
-              <label className="block text-xs text-[#6B7B8C] uppercase tracking-wide font-semibold mb-1.5">
-                Search ingredients
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={e => {
-                    setSearchQuery(e.target.value)
-                    if (pendingFood) { setPendingFood(null); setSearchResults([]) }
-                  }}
-                  placeholder="e.g. eggs, chicken breast…"
-                  className={inputClass}
-                />
-                {isSearching && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A89F88] text-xs">
-                    …
-                  </span>
-                )}
-              </div>
-
-              {/* Search results dropdown */}
-              {searchResults.length > 0 && !pendingFood && (
-                <div className="mt-1 bg-[#F5EFE0] rounded-xl border border-[#E3DBC9]
-                                overflow-hidden max-h-44 overflow-y-auto">
-                  {searchResults.map(food => (
-                    <button
-                      key={food.id}
-                      type="button"
-                      onClick={() => selectSearchResult(food)}
-                      className="w-full flex items-center justify-between px-3 py-2.5
-                                 text-left hover:bg-[#EFE8D8] transition-colors
-                                 border-b border-[#E3DBC9] last:border-b-0"
-                    >
-                      <span className="text-sm text-[#1A2E45] truncate pr-2 flex-1">
-                        {food.name}
-                      </span>
-                      <span className="text-xs text-[#A89F88] flex-shrink-0">
-                        {food.calories != null ? `${Math.round(food.calories)} kcal` : '—'}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Portion picker — shown when a food is selected */}
-            {pendingFood && (
-              <div className="bg-[#F5EFE0] rounded-2xl border border-[#E3DBC9] p-4 space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-[10px] text-[#A89F88] font-semibold uppercase tracking-wide">
-                      Adding
-                    </p>
-                    <p className="text-sm font-semibold text-[#1A2E45] mt-0.5 leading-snug">
-                      {pendingFood.name}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={cancelPendingFood}
-                    className="text-[#A89F88] hover:text-[#6B7B8C] text-xs flex-shrink-0 mt-0.5"
+            {/* Ingredient list — compact single-line rows */}
+            {ingredients.length > 0 && (
+              <div className="space-y-1.5">
+                {ingredients.map((ing, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-2 bg-[#F5EFE0] rounded-xl
+                               px-3 py-2.5 border border-[#E3DBC9]"
                   >
-                    ✕
-                  </button>
-                </div>
-
-                <div className="flex gap-2">
-                  <div className="w-20 flex-shrink-0">
-                    <label className="block text-xs text-[#6B7B8C] font-semibold mb-1">Qty</label>
-                    <input
-                      type="number"
-                      min="0.1"
-                      step="0.1"
-                      value={pendingQty}
-                      onChange={e => setPendingQty(e.target.value)}
-                      className={inputClass}
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label className="block text-xs text-[#6B7B8C] font-semibold mb-1">Portion</label>
-                    <select
-                      value={pendingPortion}
-                      onChange={e => setPendingPortion(Number(e.target.value))}
-                      className={inputClass}
+                    <span className="text-sm text-[#1A2E45] flex-1 truncate">
+                      {ing.quantity} {ing.unit} · {ing.description}
+                    </span>
+                    <span className="text-xs text-[#6B7B8C] font-medium flex-shrink-0">
+                      {calcIngCals(ing)} cal
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeIngredient(idx)}
+                      className="w-5 h-5 flex items-center justify-center rounded-full
+                                 bg-[#E3DBC9] text-[#A89F88] hover:bg-[#D4CDB9]
+                                 text-[10px] font-bold flex-shrink-0 transition-colors"
                     >
-                      {pendingFood.portions.map((p, i) => (
-                        <option key={i} value={i}>{p.label}</option>
-                      ))}
-                    </select>
+                      ✕
+                    </button>
                   </div>
-                </div>
-
-                {/* Live calorie preview */}
-                {(() => {
-                  const portion = pendingFood.portions[pendingPortion]
-                  const grams   = (parseFloat(pendingQty) || 0) * portion.grams
-                  const cals    = pendingFood.calories != null
-                    ? Math.round(pendingFood.calories * grams / 100) : null
-                  return cals != null ? (
-                    <p className="text-xs text-[#6B7B8C]">
-                      ≈ {Math.round(grams)}g · {cals} kcal
-                    </p>
-                  ) : null
-                })()}
-
-                <button
-                  type="button"
-                  onClick={confirmAddIngredient}
-                  className="w-full py-2 rounded-xl bg-[#1A2E45] hover:bg-[#152639]
-                             text-white text-sm font-semibold transition-colors"
-                >
-                  + Add ingredient
-                </button>
+                ))}
               </div>
             )}
 
-            {/* Selected ingredient list */}
+            {/* Running totals — shown once there's at least one ingredient */}
             {ingredients.length > 0 && (
-              <div>
-                <p className="text-xs text-[#A89F88] uppercase tracking-wide font-semibold mb-2">
-                  Ingredients ({ingredients.length})
+              <div className="bg-[#1A2E45]/5 rounded-xl px-3 py-2.5 -mt-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-[#1A2E45]">Total</span>
+                  <span className="text-sm font-bold text-[#1A2E45]">{totalCals} kcal</span>
+                </div>
+                <p className="text-xs text-[#6B7B8C] mt-0.5">
+                  {totalProtein}g protein · {totalCarbs}g carbs · {totalFat}g fat
                 </p>
-                <div className="space-y-1.5">
-                  {ingredients.map((ing, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center gap-2 bg-[#F5EFE0] rounded-xl
-                                 px-3 py-2.5 border border-[#E3DBC9]"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-semibold text-[#1A2E45] truncate">
-                          {ing.quantity} {ing.unit}
-                        </div>
-                        <div className="text-xs text-[#6B7B8C] truncate">{ing.description}</div>
+              </div>
+            )}
+
+            {/* Dashed add-ingredient button — collapsed state */}
+            {!showIngredientSearch && (
+              <button
+                type="button"
+                onClick={() => setShowIngredientSearch(true)}
+                className="w-full py-2.5 rounded-xl border-2 border-dashed border-[#1A2E45]/30
+                           text-[#1A2E45] text-sm font-semibold flex items-center justify-center
+                           gap-1.5 hover:border-[#1A2E45]/60 hover:bg-[#1A2E45]/5 transition-colors"
+              >
+                <span className="text-base leading-none">+</span>
+                {ingredients.length === 0 ? 'Add an ingredient' : 'Add another ingredient'}
+              </button>
+            )}
+
+            {/* Search panel — expanded when showIngredientSearch is true */}
+            {showIngredientSearch && (
+              <div className="space-y-3">
+                {/* Panel header */}
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-[#6B7B8C] uppercase tracking-wide font-semibold">
+                    Search ingredient
+                  </p>
+                  <button
+                    type="button"
+                    onClick={closeSearch}
+                    className="text-xs text-[#A89F88] hover:text-[#6B7B8C] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+
+                {/* Search input */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    autoFocus
+                    value={searchQuery}
+                    onChange={e => {
+                      setSearchQuery(e.target.value)
+                      if (pendingFood) { setPendingFood(null); setSearchResults([]) }
+                    }}
+                    placeholder="e.g. eggs, chicken breast…"
+                    className={inputClass}
+                  />
+                  {isSearching && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A89F88] text-xs">
+                      …
+                    </span>
+                  )}
+                </div>
+
+                {/* Search results */}
+                {searchResults.length > 0 && !pendingFood && (
+                  <div className="bg-[#F5EFE0] rounded-xl border border-[#E3DBC9]
+                                  overflow-hidden max-h-44 overflow-y-auto">
+                    {searchResults.map(food => (
+                      <button
+                        key={food.id}
+                        type="button"
+                        onClick={() => selectSearchResult(food)}
+                        className="w-full flex items-center justify-between px-3 py-2.5
+                                   text-left hover:bg-[#EFE8D8] transition-colors
+                                   border-b border-[#E3DBC9] last:border-b-0"
+                      >
+                        <span className="text-sm text-[#1A2E45] truncate pr-2 flex-1">
+                          {food.name}
+                        </span>
+                        <span className="text-xs text-[#A89F88] flex-shrink-0">
+                          {food.calories != null ? `${Math.round(food.calories)} kcal` : '—'}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Portion picker */}
+                {pendingFood && (
+                  <div className="bg-[#F5EFE0] rounded-2xl border border-[#E3DBC9] p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-[#A89F88] font-semibold uppercase tracking-wide">
+                          Adding
+                        </p>
+                        <p className="text-sm font-semibold text-[#1A2E45] mt-0.5 leading-snug">
+                          {pendingFood.name}
+                        </p>
                       </div>
-                      <span className="text-xs text-[#6B7B8C] font-medium flex-shrink-0">
-                        {calcIngCals(ing)} cal
-                      </span>
                       <button
                         type="button"
-                        onClick={() => removeIngredient(idx)}
-                        className="w-5 h-5 flex items-center justify-center rounded-full
-                                   bg-[#E3DBC9] text-[#A89F88] hover:bg-[#D4CDB9]
-                                   text-[10px] font-bold flex-shrink-0 transition-colors"
+                        onClick={() => { setPendingFood(null); setSearchQuery(''); setSearchResults([]) }}
+                        className="text-[#A89F88] hover:text-[#6B7B8C] text-xs flex-shrink-0 mt-0.5"
                       >
                         ✕
                       </button>
                     </div>
-                  ))}
-                </div>
 
-                {/* Running totals */}
-                <div className="mt-2.5 bg-[#1A2E45]/5 rounded-xl px-3 py-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-[#1A2E45]">Total</span>
-                    <span className="text-sm font-bold text-[#1A2E45]">{totalCals} kcal</span>
+                    <div className="flex gap-2">
+                      <div className="w-20 flex-shrink-0">
+                        <label className="block text-xs text-[#6B7B8C] font-semibold mb-1">Qty</label>
+                        <input
+                          type="number"
+                          min="0.1"
+                          step="0.1"
+                          value={pendingQty}
+                          onChange={e => setPendingQty(e.target.value)}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-xs text-[#6B7B8C] font-semibold mb-1">Portion</label>
+                        <select
+                          value={pendingPortion}
+                          onChange={e => setPendingPortion(Number(e.target.value))}
+                          className={inputClass}
+                        >
+                          {pendingFood.portions.map((p, i) => (
+                            <option key={i} value={i}>{p.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Live calorie preview */}
+                    {(() => {
+                      const portion = pendingFood.portions[pendingPortion]
+                      const grams   = (parseFloat(pendingQty) || 0) * portion.grams
+                      const cals    = pendingFood.calories != null
+                        ? Math.round(pendingFood.calories * grams / 100) : null
+                      return cals != null ? (
+                        <p className="text-xs text-[#6B7B8C]">
+                          ≈ {Math.round(grams)}g · {cals} kcal
+                        </p>
+                      ) : null
+                    })()}
+
+                    <button
+                      type="button"
+                      onClick={confirmAddIngredient}
+                      className="w-full py-2 rounded-xl bg-[#1A2E45] hover:bg-[#152639]
+                                 text-white text-sm font-semibold transition-colors"
+                    >
+                      + Add ingredient
+                    </button>
                   </div>
-                  <p className="text-xs text-[#6B7B8C] mt-0.5">
-                    {totalProtein}g protein · {totalCarbs}g carbs · {totalFat}g fat
-                  </p>
-                </div>
+                )}
               </div>
             )}
 
