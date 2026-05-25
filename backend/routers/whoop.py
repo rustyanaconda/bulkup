@@ -8,10 +8,14 @@ OAuth flow:
   3. Frontend reads ?code= and POSTs it here:
   4. POST /whoop/callback          → exchanges code for tokens, stores on user row
 """
-from fastapi import APIRouter, HTTPException, Depends
+import logging
+
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from datetime import date
+
+logger = logging.getLogger(__name__)
 
 from database import get_db
 from models.models import User
@@ -93,3 +97,26 @@ async def get_todays_whoop_calories(user: User = Depends(get_current_user)):
         )
 
     return {"date": today, "burned_kcal": kcal, "source": "whoop"}
+
+
+@router.post("/webhook")
+async def whoop_webhook(request: Request):
+    """
+    Public endpoint — no auth. Whoop calls this server-to-server when new
+    data is available. Stage A: log and acknowledge only.
+    """
+    headers = dict(request.headers)
+    body    = await request.body()
+
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = body.decode("utf-8", errors="replace")
+
+    event_type = payload.get("type") if isinstance(payload, dict) else "unknown"
+
+    logger.info("Whoop webhook received  event_type=%s", event_type)
+    logger.info("Whoop webhook headers:  %s", headers)
+    logger.info("Whoop webhook payload:  %s", payload)
+
+    return {"received": True}
