@@ -4,7 +4,10 @@ USDA FoodData Central search and detail endpoints.
 import os
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
-from models.models import User
+from sqlalchemy import case, func
+from sqlalchemy.orm import Session
+from database import get_db
+from models.models import Food, FoodPortion, User
 from routers.auth import get_current_user
 
 router = APIRouter()
@@ -103,6 +106,102 @@ def _build_portion_label(portion: dict) -> str:
     elif unit_name and unit_name.lower() not in ("", "undetermined", "g", "gram", "grams"):
         parts.append(unit_name)
     return " ".join(parts) if parts else "serving"
+
+
+def _serialize_portions(portions) -> list:
+    """Sort portions: default first, grams fallback last, preserve insertion order otherwise."""
+    ordered = sorted(portions, key=lambda p: (-(p.is_default or 0), p.id))
+    return [
+        {"label": p.label, "grams": p.grams, "is_default": bool(p.is_default)}
+        for p in ordered
+    ]
+
+
+@router.get("/curated/search")
+def search_curated_foods(
+    query: str       = Query(default=""),
+    _user: User      = Depends(get_current_user),
+    db:    Session   = Depends(get_db),
+):
+    q = query.strip()
+    base = db.query(Food)
+
+    if q:
+        base = base.filter(Food.name.ilike(f"%{q}%")).order_by(
+            # names that START with query rank above names that merely contain it
+            case((Food.name.ilike(f"{q}%"), 0), else_=1),
+            Food.name,
+        )
+    else:
+        base = base.order_by(Food.name)
+
+    foods = base.all()
+
+    return [
+        {
+            "id":        f.id,
+            "name":      f.name,
+            "category":  f.category,
+            "fdc_id":    f.fdc_id,
+            "calories":  f.calories,
+            "protein_g": f.protein_g,
+            "carbs_g":   f.carbs_g,
+            "fat_g":     f.fat_g,
+            "portions":  _serialize_portions(f.portions),
+        }
+        for f in foods
+    ]
+
+
+@router.get("/curated/{food_id}")
+def get_curated_food(
+    food_id: int,
+    _user:   User    = Depends(get_current_user),
+    db:      Session = Depends(get_db),
+):
+    food = db.query(Food).filter(Food.id == food_id).first()
+    if food is None:
+        raise HTTPException(status_code=404, detail="Food not found")
+
+    return {
+        "id":        food.id,
+        "name":      food.name,
+        "category":  food.category,
+        "fdc_id":    food.fdc_id,
+        "source":    food.source,
+        # macros
+        "calories":        food.calories,
+        "protein_g":       food.protein_g,
+        "carbs_g":         food.carbs_g,
+        "fat_g":           food.fat_g,
+        "fiber_g":         food.fiber_g,
+        "sugar_g":         food.sugar_g,
+        "saturated_fat_g": food.saturated_fat_g,
+        # micronutrients
+        "sodium_mg":       food.sodium_mg,
+        "potassium_mg":    food.potassium_mg,
+        "calcium_mg":      food.calcium_mg,
+        "iron_mg":         food.iron_mg,
+        "magnesium_mg":    food.magnesium_mg,
+        "zinc_mg":         food.zinc_mg,
+        "phosphorus_mg":   food.phosphorus_mg,
+        "copper_mg":       food.copper_mg,
+        "manganese_mg":    food.manganese_mg,
+        "selenium_ug":     food.selenium_ug,
+        "vitamin_a_ug":    food.vitamin_a_ug,
+        "vitamin_c_mg":    food.vitamin_c_mg,
+        "vitamin_d_ug":    food.vitamin_d_ug,
+        "vitamin_e_mg":    food.vitamin_e_mg,
+        "vitamin_k_ug":    food.vitamin_k_ug,
+        "thiamin_mg":      food.thiamin_mg,
+        "riboflavin_mg":   food.riboflavin_mg,
+        "niacin_mg":       food.niacin_mg,
+        "vitamin_b6_mg":   food.vitamin_b6_mg,
+        "folate_ug":       food.folate_ug,
+        "vitamin_b12_ug":  food.vitamin_b12_ug,
+        "cholesterol_mg":  food.cholesterol_mg,
+        "portions": _serialize_portions(food.portions),
+    }
 
 
 @router.get("/{fdc_id}")
