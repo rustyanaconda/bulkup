@@ -2,6 +2,86 @@ import { useCalories } from '../hooks/useCalories'
 import CalorieBar      from '../components/calories/CalorieBar'
 import { useMeals }    from '../hooks/useMeals'
 
+const RING   = 92
+const STROKE = 7
+const R      = (RING - STROKE) / 2          // 42.5
+const CX     = RING / 2                      // 46
+const CY     = RING / 2                      // 46
+const CIRC   = 2 * Math.PI * R              // ~267.04
+
+function BurnRingCard({ expectedBurn, whoop }) {
+  const burnedSoFar = whoop.burned_so_far
+  const live        = whoop.connected && burnedSoFar != null
+
+  const ratio      = live && expectedBurn > 0 ? Math.min(1, burnedSoFar / expectedBurn) : 0
+  const offset     = CIRC * (1 - ratio)
+  const centerText = live ? `${Math.round(ratio * 100)}%` : '—'
+
+  let whoopLabel, whoopMuted
+  if (!whoop.connected) {
+    whoopLabel = 'Not connected'; whoopMuted = true
+  } else if (burnedSoFar == null) {
+    whoopLabel = 'No reading yet'; whoopMuted = true
+  } else {
+    whoopLabel = `${Math.round(burnedSoFar).toLocaleString()} kcal`; whoopMuted = false
+  }
+
+  return (
+    <div className="bg-white rounded-2xl p-4 border border-[#E3DBC9] mb-4">
+      <p className="text-xs text-[#A89F88] uppercase tracking-wide font-semibold mb-3">
+        Today's burn
+      </p>
+
+      <div className="flex items-center gap-4">
+        {/* Ring */}
+        <div className="relative flex-shrink-0" style={{ width: RING, height: RING }}>
+          <svg width={RING} height={RING}>
+            <circle cx={CX} cy={CY} r={R} fill="none" stroke="#ECE5D5" strokeWidth={STROKE} />
+            <circle
+              cx={CX} cy={CY} r={R}
+              fill="none"
+              stroke="#1A2E45"
+              strokeWidth={STROKE}
+              strokeLinecap="round"
+              strokeDasharray={CIRC}
+              strokeDashoffset={offset}
+              transform={`rotate(-90 ${CX} ${CY})`}
+              style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+            />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-sm font-bold text-[#1A2E45]">{centerText}</span>
+          </div>
+        </div>
+
+        {/* Metrics */}
+        <div className="flex-1 space-y-3">
+          <div>
+            <p className="text-[10px] text-[#A89F88] uppercase tracking-wide font-semibold">
+              Whoop · so far today
+            </p>
+            <p className={`text-sm font-bold mt-0.5 ${whoopMuted ? 'text-[#D4CDB9]' : 'text-[#1A2E45]'}`}>
+              {whoopLabel}
+            </p>
+          </div>
+          <div>
+            <p className="text-[10px] text-[#A89F88] uppercase tracking-wide font-semibold">
+              Expected · typical day
+            </p>
+            <p className="text-sm font-bold text-[#1A2E45] mt-0.5">
+              {expectedBurn != null ? `${Math.round(expectedBurn).toLocaleString()} kcal` : '—'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <p className="text-xs text-[#A89F88] mt-3 leading-relaxed">
+        Expected is your typical daily burn. Whoop shows what you've actually burned so far.
+      </p>
+    </div>
+  )
+}
+
 export default function Home() {
   const { eaten, target, benchmark, whoop, loading } = useCalories()
   const { planned } = useMeals()
@@ -63,51 +143,8 @@ export default function Home() {
         }
       </div>
 
-      {/* Section 2 — Today's burn: expected vs. so far */}
-      {!loading && (
-        <div className="mb-4">
-          <p className="text-xs text-[#A89F88] uppercase tracking-wide font-semibold mb-2">
-            Today's burn
-          </p>
-          <div className="flex gap-3">
-            {/* Card A — benchmark expected burn */}
-            <div className="flex-1 bg-white rounded-2xl p-4 border border-[#E3DBC9]">
-              <p className="text-xs text-[#A89F88] font-semibold mb-1">Expected</p>
-              <p className="text-xl font-bold text-[#1A2E45]">
-                {expectedBurn != null ? Math.round(expectedBurn).toLocaleString() : '—'}
-              </p>
-              <p className="text-xs text-[#6B7B8C] mt-0.5">typical day</p>
-            </div>
-
-            {/* Card B — Whoop live burn */}
-            {whoop.connected ? (
-              burnedSoFar != null ? (
-                <div className="flex-1 bg-[#1A2E45] rounded-2xl p-4">
-                  <p className="text-xs text-white/60 font-semibold mb-1">Whoop</p>
-                  <p className="text-xl font-bold text-white">
-                    {Math.round(burnedSoFar).toLocaleString()}
-                  </p>
-                  <p className="text-xs text-white/60 mt-0.5">so far today</p>
-                </div>
-              ) : (
-                <div className="flex-1 bg-white rounded-2xl p-4 border border-[#E3DBC9]">
-                  <p className="text-xs text-[#A89F88] font-semibold mb-1">Whoop</p>
-                  <p className="text-xl font-bold text-[#D4CDB9]">—</p>
-                  <p className="text-xs text-[#A89F88] mt-0.5">no reading yet</p>
-                </div>
-              )
-            ) : (
-              <div className="flex-1 bg-white rounded-2xl p-4 border border-[#E3DBC9]">
-                <p className="text-xs text-[#A89F88] font-semibold mb-1">Whoop</p>
-                <p className="text-sm text-[#D4CDB9] mt-1">Not connected</p>
-                <a href="/profile" className="text-xs text-[#A89F88] hover:text-[#6B7B8C] mt-1 block">
-                  Connect →
-                </a>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Section 2 — Today's burn ring */}
+      {!loading && <BurnRingCard expectedBurn={expectedBurn} whoop={whoop} />}
 
       {/* Section 3 — Insight line */}
       {insightLine && (
