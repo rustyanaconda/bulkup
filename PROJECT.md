@@ -5,7 +5,7 @@
 > features ship. If starting a fresh conversation, hand over this file to get back
 > up to speed quickly.
 
-_Last updated: May 2026_
+_Last updated: May 26, 2026_
 
 ---
 
@@ -111,6 +111,40 @@ These are the guiding values for every product and engineering decision:
   portions, live nutrition preview, running totals, dashed "add another ingredient"
   flow; builds a meal from multiple ingredients with auto-calculated nutrition. Live
   and verified on mise.fit.
+- **Curated breads/bagels (Day 1 curation)** — 7 added: plain/egg/whole-wheat bagels,
+  white/whole-wheat/sourdough/multigrain breads. (Everything bagel skipped — USDA has
+  none, and it's nutritionally ~identical to plain, confirmed against a real TJ's label.)
+  Seeder made insert-only by default (skips existing, no USDA call) with a `--force`
+  flag to refresh — keeps adds fast as the list grows.
+- **Whoop token auto-refresh (FIXED)** — root cause of stale "estimated" burn: the
+  access token expired (~1hr) and was never refreshed, so fetches 401'd silently and
+  fell back to the formula. Now: on a 401, the code uses the stored refresh token to
+  get a new access token, saves it, and retries. Extracted into shared helper
+  `fetch_daily_calories_with_refresh()` used by both the endpoint and the capture
+  script. Whoop data now stays current. (Lesson: webhooks are the wrong tool for
+  "current burn" — Whoop only webhooks discrete events, not continuous calorie ticks;
+  polling + token refresh is the right approach. A webhook receiver was built but is
+  unused.)
+- **TDEE math verified** — confirmed NOT double-counting BMR: Whoop's daily number is
+  TOTAL burn (includes BMR), and the code does `activity = max(0, whoop_total - bmr)`
+  then `target = bmr + activity + surplus`. Correct. Also learned Whoop "daily" cycles
+  align to sleep/wake (~3:48am), not calendar midnight, and the current day's cycle is
+  OPEN (climbs through the day) — so a partial reading early in the day is normal pace,
+  not an error.
+- **Burn display: benchmark vs. current pace** — Home page shows (1) an EATEN→target
+  progress bar (target anchored to the stable formula benchmark, not the live Whoop
+  number, so it doesn't jump around), and (2) a progress RING showing real Whoop burn
+  "so far today" filling toward the "expected (typical day)" benchmark burn, with one
+  plain-language helper line. /calories/today now returns `benchmark` and `whoop`
+  (connected + burned_so_far) as separate values. Live and verified.
+- **Burn-snapshot data collection** — `burn_snapshots` table (user_id, date,
+  recorded_at, burned_kcal) + a standalone capture script (reuses the token-refresh
+  helper, skips None/unscored readings) running on an HOURLY Railway CRON SERVICE
+  (separate service, same repo, root dir `backend`, start cmd
+  `python capture_burn_snapshots.py`, cron `0 * * * *`, needs DATABASE_URL +
+  WHOOP_CLIENT_ID/SECRET). Verified inserting one row/hour. Purpose: accumulate the
+  time-series history needed to LATER build a personalized end-of-day burn prediction
+  (the prediction model itself is deferred until enough data exists — see roadmap).
 
 ---
 
@@ -147,6 +181,12 @@ These are the guiding values for every product and engineering decision:
   Tags like "organic" / "plastic free" become sourcing hooks. Requires structured,
   "canonical" ingredients (one master entry per ingredient so quantities sum across
   recipes) — this is why ingredient structure matters long-term.
+- **Personalized burn-curve prediction** — learn each user's daily burn *pattern*
+  from the hourly burn_snapshots (e.g. "this user works out ~7pm, so their burn is
+  flat midday then spikes evening") and project their END-OF-DAY Whoop total from a
+  partial reading. Turns the partial-day problem into a "projected total" feature.
+  PREREQUISITE (already running): hourly snapshot collection — the model is DEFERRED
+  until weeks of data accumulate. Don't build the model until there's enough history.
 - **HSA/FSA payment** (future idea) — let users pay with HSA/FSA funds. Note: not
   automatic — usually needs Letter of Medical Necessity / medical-expense positioning
   + a compatible payment processor. Down-the-road, once there's revenue/positioning.
@@ -161,8 +201,9 @@ volume; curation/quality is the whole edge). User signals when a new "day" start
 (assistant has no sense of time between sessions). Workflow per batch: search for
 clean fdcIds → add to seed_foods.py with portions → run via Railway CLI.
 
-- [ ] **Day 1 — Breads & bagels:** plain bagel, egg bagel, everything bagel, whole
-      wheat bagel, white bread, whole wheat bread, sourdough, multigrain
+- [x] **Day 1 — Breads & bagels: DONE.** Added: plain bagel, egg bagel, whole wheat
+      bagel, white bread, whole wheat bread, sourdough, multigrain (7). Everything
+      bagel skipped (USDA has none; ~identical to plain). List now ~26 foods.
 - [ ] **Day 2 — Cheeses & dairy extras:** Mexican blend shredded, cheddar, mozzarella,
       parmesan, cottage cheese, butter, cream cheese
 - [ ] **Day 3 — More proteins:** turkey breast, pork chop, canned tuna, shrimp, tofu,

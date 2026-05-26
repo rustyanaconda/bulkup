@@ -198,6 +198,76 @@ CURATED_FOODS = [
         "queries": ["bread multi-grain", "bread, multigrain"],
         "portions": [("1 slice", 28, 1), ("2 slices", 56, 0)],
     },
+    {
+        "name": "Mexican blend cheese", "category": "dairy", "fdc_id": 171288,
+        "queries": ["cheese mexican blend", "cheese, mexican, blend", "cheese monterey"],
+        "portions": [("1/4 cup shredded", 28, 1), ("1 oz", 28, 0), ("1/2 cup shredded", 56, 0)],
+    },
+    {
+        "name": "Mexican blend cheese (low-fat)", "category": "dairy", "fdc_id": 172216,
+        "queries": ["cheese mexican blend low fat", "cheese, mexican blend, reduced fat"],
+        "portions": [("1/4 cup shredded", 28, 1), ("1 oz", 28, 0), ("1/2 cup shredded", 56, 0)],
+    },
+    {
+        "name": "Cheddar cheese", "category": "dairy", "fdc_id": 170899,
+        "queries": ["cheese cheddar", "cheese, cheddar"],
+        "portions": [("1 slice", 23, 1), ("1 oz", 28, 0), ("1/4 cup shredded", 28, 0)],
+    },
+    {
+        "name": "Mozzarella cheese", "category": "dairy", "fdc_id": 170845,
+        "queries": ["cheese mozzarella whole milk", "cheese, mozzarella, whole milk"],
+        "portions": [("1 oz", 28, 1), ("1/4 cup shredded", 28, 0), ("1 slice", 28, 0)],
+    },
+    {
+        "name": "Parmesan cheese", "category": "dairy", "fdc_id": 171247,
+        "queries": ["cheese parmesan grated", "cheese, parmesan, grated"],
+        "portions": [("1 tbsp grated", 5, 1), ("1 oz", 28, 0), ("1/4 cup grated", 20, 0)],
+    },
+    {
+        "name": "Pepper jack cheese", "category": "dairy", "fdc_id": 170844,
+        "queries": ["cheese monterey jack", "cheese pepper jack", "cheese, monterey"],
+        "portions": [("1 slice", 28, 1), ("1 oz", 28, 0)],
+    },
+    {
+        "name": "American cheese", "category": "dairy", "fdc_id": 747429,
+        "queries": ["cheese american pasteurized process", "cheese, pasteurized process, american"],
+        "portions": [("1 slice", 23, 1), ("1 oz", 28, 0)],
+    },
+    {
+        "name": "Swiss cheese", "category": "dairy", "fdc_id": 171251,
+        "queries": ["cheese swiss", "cheese, swiss"],
+        "portions": [("1 slice", 28, 1), ("1 oz", 28, 0)],
+    },
+    {
+        "name": "Provolone cheese", "category": "dairy", "fdc_id": 170850,
+        "queries": ["cheese provolone", "cheese, provolone"],
+        "portions": [("1 slice", 28, 1), ("1 oz", 28, 0)],
+    },
+    {
+        "name": "String cheese", "category": "dairy", "fdc_id": 171244,
+        "queries": ["cheese mozzarella low moisture part skim", "cheese, mozzarella, part skim"],
+        "portions": [("1 stick", 28, 1), ("1 oz", 28, 0)],
+    },
+    {
+        "name": "Cottage cheese", "category": "dairy", "fdc_id": 172179,
+        "queries": ["cheese cottage creamed", "cheese, cottage, creamed"],
+        "portions": [("1/2 cup", 113, 1), ("1 cup", 226, 0), ("1/4 cup", 57, 0)],
+    },
+    {
+        "name": "Cream cheese", "category": "dairy", "fdc_id": 173418,
+        "queries": ["cheese cream", "cheese, cream"],
+        "portions": [("1 tbsp", 14, 1), ("2 tbsp", 28, 0), ("1 oz", 28, 0)],
+    },
+    {
+        "name": "Butter (salted)", "category": "fat", "fdc_id": 173410,
+        "queries": ["butter salted", "butter, salted"],
+        "portions": [("1 tbsp", 14, 1), ("1 tsp", 5, 0), ("1 pat", 5, 0)],
+    },
+    {
+        "name": "Butter (unsalted)", "category": "fat", "fdc_id": 173430,
+        "queries": ["butter without salt", "butter, without salt"],
+        "portions": [("1 tbsp", 14, 1), ("1 tsp", 5, 0), ("1 pat", 5, 0)],
+    },
 ]
 
 
