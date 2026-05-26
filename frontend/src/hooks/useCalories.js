@@ -23,11 +23,10 @@ export function useCalories() {
   useEffect(() => { load() }, [load])
 
   return {
-    eaten:          data?.eaten           ?? 0,
-    burned:         data?.burned          ?? null,
-    target:         data?.target          ?? 3240,
-    breakdown:      data?.breakdown       ?? null,
-    whoopConnected: data?.whoop_connected ?? false,
+    eaten:     data?.eaten      ?? 0,
+    target:    data?.target     ?? 3240,
+    benchmark: data?.benchmark  ?? null,
+    whoop:     data?.whoop      ?? { connected: false, burned_so_far: null },
     loading,
     error,
     refetch: load,
