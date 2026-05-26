@@ -83,25 +83,30 @@ async def get_daily_calories(access_token: str, date: str) -> int | None:
     (usually happens in the morning before enough data is collected).
     """
     headers = {"Authorization": f"Bearer {access_token}"}
+    start   = f"{date}T00:00:00.000Z"
+    end     = f"{date}T23:59:59.000Z"
+
+    print(f"=== WHOOP get_daily_calories date={date} start={start} end={end}", flush=True)
 
     async with httpx.AsyncClient() as client:
         response = await client.get(
             f"{WHOOP_BASE}/v2/cycle",
             headers=headers,
-            params={
-                "start": f"{date}T00:00:00.000Z",
-                "end":   f"{date}T23:59:59.000Z",
-            }
+            params={"start": start, "end": end},
         )
+        print(f"=== WHOOP response status: {response.status_code}", flush=True)
         response.raise_for_status()
         data = response.json()
+        print(f"=== WHOOP raw response: {data}", flush=True)
 
         records = data.get("records", [])
+        print(f"=== WHOOP records count: {len(records)}", flush=True)
         if not records:
             return None
 
-        cycle      = records[0]
-        score      = cycle.get("score", {})
+        cycle = records[0]
+        score = cycle.get("score", {})
+        print(f"=== WHOOP first record score: {score}", flush=True)
         kilojoules = score.get("kilojoule")
 
         if kilojoules is None:
