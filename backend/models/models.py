@@ -210,6 +210,16 @@ class FoodPortion(Base):
     food = relationship("Food", back_populates="portions")
 
 
+class BurnSnapshot(Base):
+    __tablename__ = "burn_snapshots"
+
+    id          = Column(Integer,  primary_key=True, index=True)
+    user_id     = Column(Integer,  ForeignKey("users.id"), nullable=False, index=True)
+    date        = Column(Date,     nullable=False)
+    recorded_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    burned_kcal = Column(Integer,  nullable=True)
+
+
 class Tag(Base):
     __tablename__ = "tags"
 
