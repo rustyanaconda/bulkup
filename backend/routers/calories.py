@@ -64,8 +64,10 @@ async def get_today(
     if user.whoop_access_token:
         try:
             burned = await get_daily_calories(user.whoop_access_token, today.isoformat())
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"=== WHOOP FETCH FAILED: {type(e).__name__}: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
 
     breakdown = calculate_target(
         weight_lbs=user.weight_lbs          or 170,
