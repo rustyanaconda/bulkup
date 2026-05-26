@@ -60,24 +60,34 @@ async def get_today(
         for log, meal in rows
     )
 
+    # Benchmark: pure formula estimate — never uses Whoop so it's stable all day
+    benchmark = calculate_target(
+        weight_lbs=user.weight_lbs        or 170,
+        height_in=user.height_in          or 70,
+        age=user.age                      or 25,
+        sex=user.sex                      or "male",
+        activity_multiplier=user.activity or 1.55,
+        surplus_kcal=user.surplus         or 500,
+    )
+    expected_burn = benchmark["bmr"] + benchmark["activity"]
+
+    # Live Whoop burn — may be None (not scored yet) or partial (climbs through day)
     burned: int | None = None
     if user.whoop_access_token:
         burned = await fetch_daily_calories_with_refresh(user, db, today.isoformat())
 
-    breakdown = calculate_target(
-        weight_lbs=user.weight_lbs          or 170,
-        height_in=user.height_in            or 70,
-        age=user.age                        or 25,
-        sex=user.sex                        or "male",
-        activity_multiplier=user.activity   or 1.55,
-        surplus_kcal=user.surplus           or 500,
-        whoop_burned_kcal=burned,
-    )
-
     return {
-        "eaten":           eaten,
-        "burned":          burned,
-        "target":          breakdown["target"],
-        "breakdown":       breakdown,
-        "whoop_connected": burned is not None,
+        "eaten":  eaten,
+        "target": benchmark["target"],
+        "benchmark": {
+            "bmr":           benchmark["bmr"],
+            "activity":      benchmark["activity"],
+            "surplus":       benchmark["surplus"],
+            "expected_burn": expected_burn,
+            "target":        benchmark["target"],
+        },
+        "whoop": {
+            "connected":     bool(user.whoop_access_token),
+            "burned_so_far": burned,
+        },
     }
