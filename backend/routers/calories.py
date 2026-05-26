@@ -9,10 +9,8 @@ from datetime import date
 from database import get_db
 from models.models import MealLog, Meal, MealState, User
 from routers.auth import get_current_user
-import httpx
-
 from services.tdee_service import calculate_target
-from services.whoop_service import get_daily_calories, refresh_access_token
+from services.whoop_service import fetch_daily_calories_with_refresh
 
 router = APIRouter()
 
@@ -64,26 +62,7 @@ async def get_today(
 
     burned: int | None = None
     if user.whoop_access_token:
-        try:
-            burned = await get_daily_calories(user.whoop_access_token, today.isoformat())
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code == 401:
-                print("=== WHOOP 401 — attempting token refresh", flush=True)
-                try:
-                    tokens = await refresh_access_token(user.whoop_refresh_token)
-                    user.whoop_access_token  = tokens["access_token"]
-                    user.whoop_refresh_token = tokens.get("refresh_token", user.whoop_refresh_token)
-                    db.commit()
-                    print("=== WHOOP token refreshed — retrying fetch", flush=True)
-                    burned = await get_daily_calories(user.whoop_access_token, today.isoformat())
-                except Exception as refresh_err:
-                    print(f"=== WHOOP REFRESH FAILED: {type(refresh_err).__name__}: {refresh_err}", flush=True)
-            else:
-                print(f"=== WHOOP FETCH FAILED: {type(e).__name__}: {e}", flush=True)
-        except Exception as e:
-            print(f"=== WHOOP FETCH FAILED: {type(e).__name__}: {e}", flush=True)
-            import traceback
-            traceback.print_exc()
+        burned = await fetch_daily_calories_with_refresh(user, db, today.isoformat())
 
     breakdown = calculate_target(
         weight_lbs=user.weight_lbs          or 170,

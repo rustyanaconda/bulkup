@@ -115,6 +115,36 @@ async def get_daily_calories(access_token: str, date: str) -> int | None:
         return round(kilojoules / 4.184)
 
 
+async def fetch_daily_calories_with_refresh(user, db, date_str: str) -> int | None:
+    """
+    Fetch Whoop burn for date_str, automatically refreshing a 401 expired token.
+    Saves updated tokens to user + db if a refresh occurs.
+    Returns kcal as int, or None if Whoop hasn't scored yet or on any error.
+    """
+    try:
+        return await get_daily_calories(user.whoop_access_token, date_str)
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code != 401:
+            print(f"=== WHOOP FETCH FAILED: {type(e).__name__}: {e}", flush=True)
+            return None
+        print("=== WHOOP 401 — attempting token refresh", flush=True)
+        try:
+            tokens = await refresh_access_token(user.whoop_refresh_token)
+            user.whoop_access_token  = tokens["access_token"]
+            user.whoop_refresh_token = tokens.get("refresh_token", user.whoop_refresh_token)
+            db.commit()
+            print("=== WHOOP token refreshed — retrying fetch", flush=True)
+            return await get_daily_calories(user.whoop_access_token, date_str)
+        except Exception as refresh_err:
+            print(f"=== WHOOP REFRESH FAILED: {type(refresh_err).__name__}: {refresh_err}", flush=True)
+            return None
+    except Exception as e:
+        print(f"=== WHOOP FETCH FAILED: {type(e).__name__}: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        return None
+
+
 async def get_body_measurements(access_token: str) -> dict:
     """
     Pull height, weight, max HR from Whoop.
