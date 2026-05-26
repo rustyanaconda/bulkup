@@ -65,6 +65,9 @@ class LoginRequest(BaseModel):
 
 @router.post("/signup", status_code=201)
 def signup(req: SignupRequest, db: Session = Depends(get_db)):
+    if not os.getenv("ALLOW_SIGNUPS", "false").lower() == "true":
+        raise HTTPException(status_code=403, detail="New signups are currently closed.")
+
     if db.query(User).filter(User.email == req.email).first():
         raise HTTPException(status_code=400, detail="An account with that email already exists")
 

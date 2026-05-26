@@ -107,12 +107,7 @@ export default function Login() {
           </button>
         </form>
 
-        <p className="text-center text-sm text-[#6B7B8C] mt-6">
-          Don't have an account?{' '}
-          <Link to="/signup" className="text-[#1A2E45] font-semibold hover:underline transition-colors">
-            Sign up
-          </Link>
-        </p>
+        {/* Sign-up link hidden while signups are closed */}
       </div>
     </div>
   )
