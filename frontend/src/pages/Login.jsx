@@ -9,7 +9,8 @@ export default function Login() {
   const location  = useLocation()
   const { login } = useAuth()
 
-  const signupSuccess = location.state?.signupSuccess
+  const signupSuccess    = location.state?.signupSuccess
+  const sessionExpired   = location.state?.sessionExpired
 
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
@@ -58,6 +59,13 @@ export default function Login() {
           <div className="mb-4 text-sm text-[#2A5A3E] bg-[#2A5A3E]/10 rounded-xl px-3 py-2
                           text-center border border-[#2A5A3E]/30">
             Account created — you can now log in.
+          </div>
+        )}
+
+        {sessionExpired && (
+          <div className="mb-4 text-sm text-[#B07B2C] bg-[#B07B2C]/10 rounded-xl px-3 py-2
+                          text-center border border-[#B07B2C]/30">
+            Your session expired — please log in again.
           </div>
         )}
 
