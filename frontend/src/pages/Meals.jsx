@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Html5Qrcode, Html5QrcodeSupportedFormats, Html5QrcodeScannerState } from 'html5-qrcode'
-import { Search, Barcode, Pencil } from 'lucide-react'
+import { Search, Barcode, Pencil, Camera } from 'lucide-react'
 import { useMeals }    from '../hooks/useMeals'
 import { useCalories } from '../hooks/useCalories'
 import CalorieBar      from '../components/calories/CalorieBar'
@@ -717,7 +717,7 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
                                text-sm font-semibold flex items-center justify-center gap-2
                                hover:border-[#1A2E45]/60 hover:bg-[#1A2E45]/5 transition-colors"
                   >
-                    <span>⬛</span> Scan barcode
+                    <Camera size={17} strokeWidth={1.75} /> Scan barcode
                   </button>
                 )}
 
