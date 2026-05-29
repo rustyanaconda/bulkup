@@ -67,12 +67,7 @@ export default function Landing() {
       {/* ── Nav ──────────────────────────────────────────────────────────── */}
       <nav className="max-w-[720px] mx-auto px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="w-[30px] h-[30px] rounded-full border border-[#1A2E45]
-                          flex items-center justify-center flex-shrink-0">
-            <span className="font-serif italic text-[15px] text-[#1A2E45] leading-none select-none">
-              m
-            </span>
-          </div>
+          <img src="/logo.svg" alt="Mise logo" width={32} height={32} className="block flex-shrink-0" />
           <span className="font-serif text-lg font-semibold text-[#1A2E45]">Mise</span>
         </div>
 
