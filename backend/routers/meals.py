@@ -224,6 +224,36 @@ def create_meal_from_ingredients(
     }
 
 
+@router.delete("/{log_id}", status_code=200)
+def delete_meal(
+    log_id: int,
+    user:   User    = Depends(get_current_user),
+    db:     Session = Depends(get_db),
+):
+    log = (
+        db.query(MealLog)
+        .filter(MealLog.id == log_id, MealLog.user_id == user.id)
+        .first()
+    )
+    if log is None:
+        raise HTTPException(status_code=404, detail="Meal not found")
+
+    meal_id = log.meal_id
+
+    # Remove the log entry first (FK references meal)
+    db.delete(log)
+    db.flush()
+
+    # Remove the meal itself; cascade="all, delete-orphan" on ingredients_list
+    # propagates the delete to MealIngredient rows automatically
+    meal = db.query(Meal).filter(Meal.id == meal_id).first()
+    if meal:
+        db.delete(meal)
+
+    db.commit()
+    return {"deleted": True, "id": log_id}
+
+
 @router.patch("/{log_id}/state")
 def update_meal_state(
     log_id: int,
