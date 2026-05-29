@@ -30,21 +30,43 @@ const BARCODE_FORMATS = [
   Html5QrcodeSupportedFormats.CODE_128,
 ]
 
+const { SCANNING, PAUSED } = Html5QrcodeScannerState ?? {}
+
 function BarcodeScannerView({ onScan, onError }) {
   const instanceRef = useRef(null)
   const elementId   = useRef(`bsv-${Math.random().toString(36).slice(2)}`)
 
+  // Safe stop: only calls stop() if the scanner is actually running,
+  // and swallows every possible error so unmount can never crash the app.
+  function safeStop(scanner) {
+    try {
+      const state = scanner?.getState?.()
+      if (state === SCANNING || state === PAUSED) {
+        scanner.stop().catch(() => {})
+      }
+    } catch {
+      // getState() or stop() threw synchronously — ignore
+    }
+  }
+
   useEffect(() => {
-    const scanner = new Html5Qrcode(elementId.current)
-    instanceRef.current = scanner
+    let scanner
+    try {
+      scanner = new Html5Qrcode(elementId.current)
+      instanceRef.current = scanner
+    } catch {
+      onError(null)
+      return
+    }
 
     scanner
       .start(
         { facingMode: 'environment' },
         { fps: 10, qrbox: { width: 260, height: 100 }, formatsToSupport: BARCODE_FORMATS },
         (code) => {
-          // Successful decode — stop camera then hand off the code
-          scanner.stop().catch(() => {}).finally(() => onScan(code))
+          // Successful decode — safe-stop then hand off the code
+          safeStop(scanner)
+          onScan(code)
         },
         () => {}, // per-frame decode failures are normal; ignore
       )
@@ -53,13 +75,13 @@ function BarcodeScannerView({ onScan, onError }) {
         onError(
           msg.includes('permission') || msg.includes('denied') || msg.includes('notallowed')
             ? 'Camera access denied — enter the barcode manually below.'
-            : null, // any other error: just hide the scanner silently
+            : null, // no camera / other start error: hide scanner silently
         )
       })
 
     return () => {
-      // Stop on unmount (mode switch, modal close, scan success)
-      instanceRef.current?.stop().catch(() => {})
+      // Cleanup on every teardown path: unmount, mode switch, modal close
+      safeStop(instanceRef.current)
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
