@@ -14,12 +14,31 @@ router = APIRouter()
 
 USDA_SEARCH_URL  = "https://api.nal.usda.gov/fdc/v1/foods/search"
 USDA_DETAIL_URL  = "https://api.nal.usda.gov/fdc/v1/food/{fdc_id}"
+EDAMAM_PARSER_URL = "https://api.edamam.com/api/food-database/v2/parser"
 
 NUTRIENT_FIELDS = {
     "208": "calories",
     "203": "protein_g",
     "205": "carbs_g",
     "204": "fat_g",
+}
+
+# Edamam per-100g nutrient keys -> Food column names
+EDAMAM_NUTRIENT_MAP = {
+    "ENERC_KCAL": "calories",
+    "PROCNT":     "protein_g",
+    "CHOCDF":     "carbs_g",
+    "FAT":        "fat_g",
+    "FIBTG":      "fiber_g",
+    "SUGAR":      "sugar_g",
+    "FASAT":      "saturated_fat_g",
+    "CHOLE":      "cholesterol_mg",
+    "NA":         "sodium_mg",
+    "K":          "potassium_mg",
+    "CA":         "calcium_mg",
+    "FE":         "iron_mg",
+    "VITA_RAE":   "vitamin_a_ug",
+    "VITC":       "vitamin_c_mg",
 }
 
 
@@ -153,22 +172,15 @@ def search_curated_foods(
     ]
 
 
-@router.get("/curated/{food_id}")
-def get_curated_food(
-    food_id: int,
-    _user:   User    = Depends(get_current_user),
-    db:      Session = Depends(get_db),
-):
-    food = db.query(Food).filter(Food.id == food_id).first()
-    if food is None:
-        raise HTTPException(status_code=404, detail="Food not found")
-
+def _food_detail_dict(food: Food) -> dict:
+    """Shared response shape for curated and barcode endpoints."""
     return {
         "id":        food.id,
         "name":      food.name,
         "category":  food.category,
         "fdc_id":    food.fdc_id,
         "source":    food.source,
+        "barcode":   food.barcode,
         # macros
         "calories":        food.calories,
         "protein_g":       food.protein_g,
@@ -200,8 +212,102 @@ def get_curated_food(
         "folate_ug":       food.folate_ug,
         "vitamin_b12_ug":  food.vitamin_b12_ug,
         "cholesterol_mg":  food.cholesterol_mg,
-        "portions": _serialize_portions(food.portions),
+        "portions":        _serialize_portions(food.portions),
     }
+
+
+@router.get("/curated/{food_id}")
+def get_curated_food(
+    food_id: int,
+    _user:   User    = Depends(get_current_user),
+    db:      Session = Depends(get_db),
+):
+    food = db.query(Food).filter(Food.id == food_id).first()
+    if food is None:
+        raise HTTPException(status_code=404, detail="Food not found")
+    return _food_detail_dict(food)
+
+
+@router.get("/barcode/{barcode}")
+async def get_food_by_barcode(
+    barcode: str,
+    _user:   User    = Depends(get_current_user),
+    db:      Session = Depends(get_db),
+):
+    # ── 1. DB fast path: return immediately if we've seen this barcode before ──
+    existing = db.query(Food).filter(Food.barcode == barcode).first()
+    if existing:
+        return _food_detail_dict(existing)
+
+    # ── 2. Edamam lookup ──────────────────────────────────────────────────────
+    app_id  = os.getenv("EDAMAM_APP_ID")
+    app_key = os.getenv("EDAMAM_APP_KEY")
+    if not app_id or not app_key:
+        raise HTTPException(status_code=503, detail="Product database not configured")
+
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                EDAMAM_PARSER_URL,
+                params={"upc": barcode, "app_id": app_id, "app_key": app_key},
+                timeout=10,
+            )
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail=f"Could not reach product database: {exc}")
+
+    if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"Product database error {resp.status_code}")
+
+    hints = resp.json().get("hints", [])
+    if not hints:
+        raise HTTPException(status_code=404, detail="Product not found for this barcode.")
+
+    hint       = hints[0]
+    edamam_food = hint.get("food", {})
+    nutrients  = edamam_food.get("nutrients", {})
+
+    # ── 3. Normalize into a Food row ─────────────────────────────────────────
+    food = Food(
+        name     = edamam_food.get("label", "Unknown product"),
+        category = "branded",
+        source   = "edamam",
+        barcode  = barcode,
+        fdc_id   = None,
+    )
+    for edamam_key, col in EDAMAM_NUTRIENT_MAP.items():
+        setattr(food, col, nutrients.get(edamam_key))
+
+    db.add(food)
+    db.flush()  # assigns food.id before adding portions
+
+    # ── 4. Build portions ─────────────────────────────────────────────────────
+    serving_grams = None
+    for measure in hint.get("measures", []):
+        if measure.get("label", "").lower() == "serving" and measure.get("weight"):
+            serving_grams = measure["weight"]
+            break
+    # Fall back to servingSizes on the food object if measures had nothing useful
+    if serving_grams is None:
+        for sv in edamam_food.get("servingSizes", []):
+            if sv.get("quantity"):
+                serving_grams = sv["quantity"]
+                break
+
+    if serving_grams:
+        db.add(FoodPortion(food_id=food.id, label="1 serving",
+                           grams=serving_grams, is_default=1))
+        db.add(FoodPortion(food_id=food.id, label="grams",
+                           grams=1, is_default=0))
+    else:
+        db.add(FoodPortion(food_id=food.id, label="grams",
+                           grams=1, is_default=1))
+
+    # ── 5. Persist ────────────────────────────────────────────────────────────
+    db.commit()
+    db.refresh(food)
+
+    # ── 6. Return in curated detail shape ────────────────────────────────────
+    return _food_detail_dict(food)
 
 
 @router.get("/{fdc_id}")

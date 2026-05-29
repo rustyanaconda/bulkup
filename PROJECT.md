@@ -145,6 +145,29 @@ These are the guiding values for every product and engineering decision:
   WHOOP_CLIENT_ID/SECRET). Verified inserting one row/hour. Purpose: accumulate the
   time-series history needed to LATER build a personalized end-of-day burn prediction
   (the prediction model itself is deferred until enough data exists — see roadmap).
+- **Whoop connect simplified to ONE button (FIXED a recurring breakage)** — the old
+  flow let you enter Whoop client_id/secret through a Profile UI form, stored in an
+  IN-MEMORY `state.WHOOP_CREDS` dict that WIPED on every redeploy → Whoop kept breaking.
+  Fix: client_id/secret are app-level credentials that live ONLY in Railway env vars
+  (WHOOP_CLIENT_ID/SECRET/REDIRECT_URI), persistent. Removed the credential-entry form
+  entirely; Profile now has a single "Connect Whoop" button → GET /whoop/connect builds
+  the OAuth URL from env-var creds → redirect to Whoop → callback stores the USER's
+  tokens. Users never enter credentials. (Cleanup still TODO: delete the now-unused
+  POST /whoop/credentials endpoint + the in-memory override in state.py.)
+- **Fixed infinite redirect loop** — authFetch was doing window.location='/login' on
+  ANY 401. A feature-endpoint 401 (e.g. "Whoop not connected") wrongly triggered a
+  login redirect; with a still-valid app token, ProtectedRoute bounced back → refetch →
+  401 → loop, making the app unusable. Fix: authFetch only hard-redirects on 401s from
+  AUTH paths (/auth/, /users/me); feature 401s just throw and are handled gracefully.
+- **Session validation + graceful expiry (FIXED "silently broken / must log out & in")**
+  — AuthContext used to treat "a token string exists" as logged-in, so an EXPIRED token
+  showed the app as logged in while every request 401'd (broken, confusing). Now
+  AuthContext validates the token on load via GET /users/me: 200 → valid (store user);
+  401 → clear token + mark sessionExpired; network error → leave token alone (transient).
+  isLoggedIn = !!user (validated). ProtectedRoute shows "Loading…" during the check (no
+  flash), then redirects expired sessions to /login with an amber "Your session expired
+  — please log in again" banner. (Note: JWTs are 7-day; confirm JWT_SECRET is a stable
+  Railway env var so redeploys don't invalidate everyone's tokens.)
 
 ---
 
@@ -166,6 +189,36 @@ These are the guiding values for every product and engineering decision:
   can't be copied/owned (query-only). Upgrade target when revenue justifies it.
 
 ### Near-term (after curation list is fuller)
+- **Barcode scanning (IN PROGRESS — Edamam chosen & validated, schema done)** — felt
+  like a real competitive convenience moat (fast logging). The scan itself is easy; the
+  hard part is the barcode→nutrition DATA. Path explored: Open Food Facts (free) maps
+  barcode→product fine but its NUTRITION is messy/incomplete and doesn't fit our clean
+  schema. Nutritionix steered toward an enterprise sales call (avoided). **DECISION:
+  use Edamam** ($14/mo tier, self-serve, ~615k UPCs) as the now-solution; **NCC/NDSR
+  (Univ. Minnesota — what MacroFactor uses) is the post-revenue premium upgrade.**
+  Architecture chosen: **"scan once, own forever"** — barcode → check our DB first → if
+  new, fetch from Edamam → normalize into our Food schema → SAVE it (so next scan is
+  instant + clean + owned). **DONE:** (1) Edamam validated against real TJ's products
+  (found store-brand items, returns per-100g macros + partial micros + serving size,
+  maps to our schema — confirmed good enough); (2) signups disabled (ALLOW_SIGNUPS
+  toggle) so usage stays solo within Edamam's tier; (3) `barcode` column added to Food
+  (nullable, unique, indexed) + migration 006. **NEXT:** (a) add EDAMAM_APP_ID +
+  EDAMAM_APP_KEY to Railway env (server-side only); (b) backend endpoint: barcode →
+  check DB → Edamam → normalize → save + return; (c) camera scanner UI → add to meal.
+  Mapping decided: 14 Edamam fields map directly (cals, protein, carbs, fat, fiber,
+  sugar, sat fat, cholesterol, sodium, potassium, calcium, iron, vit A, vit C); missing
+  micros stored null; brand stays in name (no brand column); category = "branded";
+  serving weight → a "1 serving" portion. (Edamam credentials were pasted publicly
+  during testing — ROTATE them.)
+- **Mobile / iPhone app (plan decided)** — does NOT require Swift. Path:
+  **PWA now → Capacitor for App Store later.** A PWA (manifest + service worker on the
+  existing React app) makes Mise installable via "Add to Home Screen" with near-zero
+  new code, no Apple Developer account, no review — good for getting it on the user's
+  (and testers') phones to validate. **Capacitor** later wraps the same React app into
+  a real App-Store-submittable native app (needs Apple Developer $99/yr, Xcode, review)
+  — do this when ready for real public distribution. React Native is a rewrite — NOT
+  recommended (overkill, throws away the web UI). Capacitor can wrap a PWA, so doing
+  the PWA first is a stepping stone, not a detour.
 - Real food photos on meal cards (image sourcing + Supabase storage) — deferred polish
 - Preloaded curated meal library (system-owned meals so the app isn't empty for new users)
 - Browse/search/filter the meal library by tag
@@ -201,9 +254,12 @@ volume; curation/quality is the whole edge). User signals when a new "day" start
 (assistant has no sense of time between sessions). Workflow per batch: search for
 clean fdcIds → add to seed_foods.py with portions → run via Railway CLI.
 
-- [x] **Day 1 — Breads & bagels: DONE.** Added: plain bagel, egg bagel, whole wheat
-      bagel, white bread, whole wheat bread, sourdough, multigrain (7). Everything
-      bagel skipped (USDA has none; ~identical to plain). List now ~26 foods.
+- [x] **Day 2 — Cheeses & dairy: DONE.** Added 14: Mexican blend (regular + low-fat),
+      cheddar (sliced), mozzarella, parmesan, pepper jack (=Monterey Jack — USDA has no
+      pepper jack), American (Foundation entry 747429 — most but not all 29 nutrients;
+      fine for now), Swiss, provolone, string cheese (=part-skim mozzarella), cottage
+      cheese, cream cheese, butter (salted + unsalted). List now ~40 foods. Covers the
+      user's real breakfast (Mexican cheese eggs + bagel).
 - [ ] **Day 2 — Cheeses & dairy extras:** Mexican blend shredded, cheddar, mozzarella,
       parmesan, cottage cheese, butter, cream cheese
 - [ ] **Day 3 — More proteins:** turkey breast, pork chop, canned tuna, shrimp, tofu,
