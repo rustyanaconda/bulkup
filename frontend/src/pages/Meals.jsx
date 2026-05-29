@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
 import { useMeals }    from '../hooks/useMeals'
 import { useCalories } from '../hooks/useCalories'
 import CalorieBar      from '../components/calories/CalorieBar'
@@ -17,6 +18,56 @@ const MEAL_TIME_ORDER = ['breakfast', 'lunch', 'dinner', 'snack']
 const TAG_CHIP = {
   primary:     'bg-[#1A2E45]/10 text-[#1A2E45]',
   restriction: 'bg-[#B07B2C]/10 text-[#B07B2C]',
+}
+
+// ─── barcode scanner component ────────────────────────────────────────────────
+
+const BARCODE_FORMATS = [
+  Html5QrcodeSupportedFormats.UPC_A,
+  Html5QrcodeSupportedFormats.UPC_E,
+  Html5QrcodeSupportedFormats.EAN_13,
+  Html5QrcodeSupportedFormats.EAN_8,
+  Html5QrcodeSupportedFormats.CODE_128,
+]
+
+function BarcodeScannerView({ onScan, onError }) {
+  const instanceRef = useRef(null)
+  const elementId   = useRef(`bsv-${Math.random().toString(36).slice(2)}`)
+
+  useEffect(() => {
+    const scanner = new Html5Qrcode(elementId.current)
+    instanceRef.current = scanner
+
+    scanner
+      .start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 260, height: 100 }, formatsToSupport: BARCODE_FORMATS },
+        (code) => {
+          // Successful decode — stop camera then hand off the code
+          scanner.stop().catch(() => {}).finally(() => onScan(code))
+        },
+        () => {}, // per-frame decode failures are normal; ignore
+      )
+      .catch((err) => {
+        const msg = String(err?.message ?? err).toLowerCase()
+        onError(
+          msg.includes('permission') || msg.includes('denied') || msg.includes('notallowed')
+            ? 'Camera access denied — enter the barcode manually below.'
+            : null, // any other error: just hide the scanner silently
+        )
+      })
+
+    return () => {
+      // Stop on unmount (mode switch, modal close, scan success)
+      instanceRef.current?.stop().catch(() => {})
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div className="rounded-xl overflow-hidden bg-[#1A2E45]/5 border border-[#E3DBC9]">
+      <div id={elementId.current} className="w-full" />
+    </div>
+  )
 }
 
 // ─── tier 1: compact rows (earlier today) ─────────────────────────────────────
@@ -289,6 +340,8 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
   const [barcodeInput,   setBarcodeInput]   = useState('')
   const [barcodeLoading, setBarcodeLoading] = useState(false)
   const [barcodeError,   setBarcodeError]   = useState(null)
+  const [scannerActive,  setScannerActive]  = useState(false)
+  const [cameraError,    setCameraError]    = useState(null)
 
   useEffect(() => {
     authFetch('/meals/tags')
@@ -339,8 +392,8 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
     setSearchResults([])
   }
 
-  async function lookupBarcode() {
-    const code = barcodeInput.trim()
+  async function lookupBarcode(codeOverride) {
+    const code = (codeOverride !== undefined ? codeOverride : barcodeInput).trim()
     if (!code) return
     setBarcodeLoading(true)
     setBarcodeError(null)
@@ -504,6 +557,8 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
                   setPendingFood(null)
                   setBarcodeInput('')
                   setBarcodeError(null)
+                  setScannerActive(false)
+                  setCameraError(null)
                 }}
                 className={`flex-1 py-1.5 text-sm font-semibold rounded-[10px] transition-colors
                             ${mode === m
@@ -596,29 +651,74 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
               </div>
             )}
 
-            {/* Barcode input OR portion picker */}
+            {/* Barcode lookup OR portion picker */}
             {!pendingFood ? (
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={barcodeInput}
-                    onChange={e => { setBarcodeInput(e.target.value); setBarcodeError(null) }}
-                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); lookupBarcode() } }}
-                    placeholder="Enter barcode number…"
-                    className={`${inputClass} flex-1`}
-                  />
+              <div className="space-y-3">
+                {/* Camera scanner */}
+                {scannerActive ? (
+                  <>
+                    <BarcodeScannerView
+                      onScan={(code) => {
+                        setScannerActive(false)
+                        setBarcodeInput(code)
+                        lookupBarcode(code)
+                      }}
+                      onError={(msg) => {
+                        setScannerActive(false)
+                        if (msg) setCameraError(msg)
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setScannerActive(false)}
+                      className="text-xs text-[#6B7B8C] hover:text-[#1A2E45] transition-colors"
+                    >
+                      Stop camera
+                    </button>
+                  </>
+                ) : (
                   <button
                     type="button"
-                    onClick={lookupBarcode}
-                    disabled={!barcodeInput.trim() || barcodeLoading}
-                    className="px-4 py-2.5 rounded-xl bg-[#1A2E45] hover:bg-[#152639]
-                               disabled:opacity-40 text-white text-sm font-semibold
-                               transition-colors flex-shrink-0"
+                    onClick={() => { setScannerActive(true); setCameraError(null); setBarcodeError(null) }}
+                    className="w-full py-2.5 rounded-xl border border-[#1A2E45]/30 text-[#1A2E45]
+                               text-sm font-semibold flex items-center justify-center gap-2
+                               hover:border-[#1A2E45]/60 hover:bg-[#1A2E45]/5 transition-colors"
                   >
-                    {barcodeLoading ? '…' : 'Look up'}
+                    <span>⬛</span> Scan barcode
                   </button>
+                )}
+
+                {cameraError && (
+                  <p className="text-xs text-[#B07B2C]">{cameraError}</p>
+                )}
+
+                {/* Manual input — always visible as fallback */}
+                <div>
+                  <p className="text-xs text-[#A89F88] mb-1.5">
+                    {scannerActive ? 'Or enter the barcode manually' : 'Or enter the barcode manually'}
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={barcodeInput}
+                      onChange={e => { setBarcodeInput(e.target.value); setBarcodeError(null) }}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); lookupBarcode() } }}
+                      placeholder="e.g. 012345678905"
+                      className={`${inputClass} flex-1`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => lookupBarcode()}
+                      disabled={!barcodeInput.trim() || barcodeLoading}
+                      className="px-4 py-2.5 rounded-xl bg-[#1A2E45] hover:bg-[#152639]
+                                 disabled:opacity-40 text-white text-sm font-semibold
+                                 transition-colors flex-shrink-0"
+                    >
+                      {barcodeLoading ? '…' : 'Look up'}
+                    </button>
+                  </div>
                 </div>
+
                 {barcodeError && (
                   <p className="text-sm text-[#A32D2D] bg-[#A32D2D]/10 rounded-xl px-3 py-2">
                     {barcodeError}
