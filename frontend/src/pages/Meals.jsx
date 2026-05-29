@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Html5Qrcode, Html5QrcodeSupportedFormats, Html5QrcodeScannerState } from 'html5-qrcode'
+import { Search, Barcode, Pencil } from 'lucide-react'
 import { useMeals }    from '../hooks/useMeals'
 import { useCalories } from '../hooks/useCalories'
 import CalorieBar      from '../components/calories/CalorieBar'
@@ -573,7 +574,11 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
         {/* Mode toggle */}
         <div className="px-6 pb-3 flex-shrink-0">
           <div className="flex bg-[#F5EFE0] rounded-xl p-0.5">
-            {[['ingredients', 'Ingredients'], ['manual', 'Manual'], ['barcode', 'Barcode']].map(([m, label]) => (
+            {[
+              { mode: 'ingredients', label: 'Search', Icon: Search  },
+              { mode: 'barcode',     label: 'Scan',   Icon: Barcode },
+              { mode: 'manual',      label: 'Custom', Icon: Pencil  },
+            ].map(({ mode: m, label, Icon }) => (
               <button
                 key={m}
                 type="button"
@@ -587,12 +592,13 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
                   setCameraError(null)
                   setCalManual(false)
                 }}
-                className={`flex-1 py-1.5 text-sm font-semibold rounded-[10px] transition-colors
+                className={`flex-1 py-1.5 rounded-[10px] transition-colors flex flex-col items-center gap-0.5
                             ${mode === m
                               ? 'bg-white text-[#1A2E45] shadow-sm'
                               : 'text-[#A89F88] hover:text-[#6B7B8C]'}`}
               >
-                {label}
+                <Icon size={20} strokeWidth={1.75} />
+                <span className="text-[11px] font-semibold">{label}</span>
               </button>
             ))}
           </div>

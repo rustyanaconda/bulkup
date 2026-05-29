@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom'
+import { Home, UtensilsCrossed, TrendingUp, ShoppingCart, User } from 'lucide-react'
 
 const tabs = [
-  { to: '/',         label: 'Home',     icon: '🏠' },
-  { to: '/meals',    label: 'Meals',    icon: '🥗' },
-  { to: '/progress', label: 'Progress', icon: '📈' },
-  { to: '/shop',     label: 'Shop',     icon: '🛒' },
-  { to: '/profile',  label: 'Profile',  icon: '👤' },
+  { to: '/',         label: 'Home',     Icon: Home             },
+  { to: '/meals',    label: 'Meals',    Icon: UtensilsCrossed  },
+  { to: '/progress', label: 'Progress', Icon: TrendingUp       },
+  { to: '/shop',     label: 'Shop',     Icon: ShoppingCart     },
+  { to: '/profile',  label: 'Profile',  Icon: User             },
 ]
 
 export default function BottomNav() {
@@ -13,10 +14,10 @@ export default function BottomNav() {
     <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto
                     bg-white border-t border-[#E3DBC9]
                     flex justify-around py-2 z-50">
-      {tabs.map(tab => (
+      {tabs.map(({ to, label, Icon }) => (
         <NavLink
-          key={tab.to}
-          to={tab.to}
+          key={to}
+          to={to}
           end
           className={({ isActive }) =>
             `flex flex-col items-center gap-1 px-3 py-1 rounded-lg
@@ -24,8 +25,8 @@ export default function BottomNav() {
              ${isActive ? 'text-[#1A2E45] font-semibold' : 'text-[#A89F88]'}`
           }
         >
-          <span className="text-xl">{tab.icon}</span>
-          <span>{tab.label}</span>
+          <Icon size={22} strokeWidth={1.75} />
+          <span>{label}</span>
         </NavLink>
       ))}
     </nav>
