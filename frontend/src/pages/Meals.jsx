@@ -1149,7 +1149,7 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
 
 export default function Meals() {
   const { meals, loading, error, updateMealState, addMeal, addMealFromIngredients, eaten, planned } = useMeals()
-  const { target } = useCalories()
+  const { target, loading: calLoading } = useCalories()
   const [showModal, setShowModal] = useState(false)
 
   if (loading) return (
@@ -1183,7 +1183,10 @@ export default function Meals() {
       </div>
 
       <div className="mb-4">
-        <CalorieBar eaten={eaten} planned={planned} target={target} />
+        {calLoading
+          ? <CalorieBar eaten={0} target={null} />
+          : <CalorieBar eaten={eaten ?? 0} planned={planned} target={target} />
+        }
       </div>
 
       {!hasAnyMeals ? (

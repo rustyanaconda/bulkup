@@ -6,9 +6,22 @@
  *   target — daily kcal goal (benchmark-based)
  *   planned — accepted but unused (kept for Meals.jsx compat)
  */
-export default function CalorieBar({ eaten = 0, target = 3240, planned = 0 }) {
-  const pct       = Math.min(100, target > 0 ? (eaten / target) * 100 : 0)
-  const remaining = target - eaten
+export default function CalorieBar({ eaten = 0, target = null, planned = 0 }) {
+  if (target == null) {
+    return (
+      <div className="bg-white rounded-2xl p-4 border border-[#E3DBC9]">
+        <div className="flex justify-between items-center mb-2">
+          <span className="text-xs font-semibold text-[#6B7B8C] uppercase tracking-wide">Eaten</span>
+          <span className="text-sm text-[#A89F88]">—</span>
+        </div>
+        <div className="h-2.5 bg-[#ECE5D5] rounded-full mb-2" />
+        <p className="text-xs text-[#A89F88]">Loading…</p>
+      </div>
+    )
+  }
+
+  const pct       = Math.min(100, target > 0 ? ((eaten ?? 0) / target) * 100 : 0)
+  const remaining = target - (eaten ?? 0)
   const hit       = remaining <= 0
 
   return (
@@ -18,7 +31,7 @@ export default function CalorieBar({ eaten = 0, target = 3240, planned = 0 }) {
           Eaten
         </span>
         <span className="text-sm font-bold text-[#1A2E45]">
-          {Math.round(eaten).toLocaleString()} / {Math.round(target).toLocaleString()} kcal
+          {Math.round(eaten ?? 0).toLocaleString()} / {Math.round(target).toLocaleString()} kcal
         </span>
       </div>
 
