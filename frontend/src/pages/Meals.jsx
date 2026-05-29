@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
+import { Html5Qrcode, Html5QrcodeSupportedFormats, Html5QrcodeScannerState } from 'html5-qrcode'
 import { useMeals }    from '../hooks/useMeals'
 import { useCalories } from '../hooks/useCalories'
 import CalorieBar      from '../components/calories/CalorieBar'
