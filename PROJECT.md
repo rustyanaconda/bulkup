@@ -168,6 +168,26 @@ These are the guiding values for every product and engineering decision:
   flash), then redirects expired sessions to /login with an amber "Your session expired
   — please log in again" banner. (Note: JWTs are 7-day; confirm JWT_SECRET is a stable
   Railway env var so redeploys don't invalidate everyone's tokens.)
+- **Barcode scanning (BUILT — works on phone)** — third mode in Add Meal modal:
+  Ingredients | Quick | Barcode. Architecture is "scan once, own forever":
+  GET /foods/barcode/{barcode} checks our foods table first (instant if seen before),
+  else calls Edamam (food-database parser, upc lookup; EDAMAM_APP_ID/KEY in Railway
+  env, server-side only), normalizes the per-100g data into our Food schema, saves it
+  (category "branded", source "edamam", barcode set, missing micros null), and returns
+  it. Path 1 model: a scanned product becomes an ADJUSTABLE INGREDIENT (qty + portion +
+  live nutrition preview) added to the same ingredient list as curated foods — scan can
+  be a whole meal or combined with others. Camera via html5-qrcode (rear camera,
+  UPC-A/E/EAN-13/8); manual barcode entry as fallback. Works on phone; gracefully does
+  nothing on desktop (no camera). Backend: meal_ingredients.fdc_id made nullable
+  (migration 007) + /meals/from-ingredients accepts food_id for scanned/curated items
+  (no fdc_id). Bugs fixed during build: scanner cleanup crashed the app (called stop()
+  when not running → guarded with getState() + try/catch via safeStop helper); missing
+  Html5QrcodeScannerState import. Edamam validated against real TJ's store-brand
+  products. (TODO: rotate Edamam creds — pasted publicly during testing.)
+- **Calorie-flash fix** — useCalories returned a hardcoded fallback (target 3240) while
+  loading, which flashed then jumped to the real value (3341) on refresh. Now numbers
+  default to null while loading and the UI shows a skeleton/loading state instead of a
+  fake number. Hardcoded 3240 removed entirely (any hardcoded default drifts wrong).
 
 ---
 
@@ -189,27 +209,18 @@ These are the guiding values for every product and engineering decision:
   can't be copied/owned (query-only). Upgrade target when revenue justifies it.
 
 ### Near-term (after curation list is fuller)
-- **Barcode scanning (IN PROGRESS — Edamam chosen & validated, schema done)** — felt
-  like a real competitive convenience moat (fast logging). The scan itself is easy; the
-  hard part is the barcode→nutrition DATA. Path explored: Open Food Facts (free) maps
-  barcode→product fine but its NUTRITION is messy/incomplete and doesn't fit our clean
-  schema. Nutritionix steered toward an enterprise sales call (avoided). **DECISION:
-  use Edamam** ($14/mo tier, self-serve, ~615k UPCs) as the now-solution; **NCC/NDSR
-  (Univ. Minnesota — what MacroFactor uses) is the post-revenue premium upgrade.**
-  Architecture chosen: **"scan once, own forever"** — barcode → check our DB first → if
-  new, fetch from Edamam → normalize into our Food schema → SAVE it (so next scan is
-  instant + clean + owned). **DONE:** (1) Edamam validated against real TJ's products
-  (found store-brand items, returns per-100g macros + partial micros + serving size,
-  maps to our schema — confirmed good enough); (2) signups disabled (ALLOW_SIGNUPS
-  toggle) so usage stays solo within Edamam's tier; (3) `barcode` column added to Food
-  (nullable, unique, indexed) + migration 006. **NEXT:** (a) add EDAMAM_APP_ID +
-  EDAMAM_APP_KEY to Railway env (server-side only); (b) backend endpoint: barcode →
-  check DB → Edamam → normalize → save + return; (c) camera scanner UI → add to meal.
-  Mapping decided: 14 Edamam fields map directly (cals, protein, carbs, fat, fiber,
-  sugar, sat fat, cholesterol, sodium, potassium, calcium, iron, vit A, vit C); missing
-  micros stored null; brand stays in name (no brand column); category = "branded";
-  serving weight → a "1 serving" portion. (Edamam credentials were pasted publicly
-  during testing — ROTATE them.)
+- **Barcode scanning (BUILT — see Features). NEXT-RELATED:** rotate Edamam creds;
+  optionally hand-add richer portions to scanned products later; revisit NCC/NDSR
+  (Univ. Minnesota, MacroFactor's source) as the post-revenue premium data upgrade.
+- **Quick → "Manual" mode revamp (PLANNED, not built)** — current Quick mode (name +
+  calories only) produces junk data with no macros, undercutting the app's accuracy
+  pitch. Decision: KEEP manual entry as a FALLBACK (for restaurant/homemade meals the
+  structured paths can't cover) but make it capture MACROS: name + protein/carbs/fat →
+  calories AUTO-CALCULATED (4/4/9, overridable). Micros = an OPTIONAL expandable section
+  ("add micros if ambitious") showing a label-realistic subset (sodium, potassium,
+  calcium, iron, fiber, sugar, sat fat, cholesterol, vit D, vit C — the ones on actual
+  nutrition labels), not all 22. Leave unentered micros null. Creates a standalone meal.
+  Consider renaming "Quick" → "Manual". Ingredients + Barcode stay the primary modes.
 - **Mobile / iPhone app (plan decided)** — does NOT require Swift. Path:
   **PWA now → Capacitor for App Store later.** A PWA (manifest + service worker on the
   existing React app) makes Mise installable via "Add to Home Screen" with near-zero

@@ -8,7 +8,7 @@ import { authFetch }   from '../utils/api'
 // ─── constants ────────────────────────────────────────────────────────────────
 
 const MEAL_TIMES  = ['breakfast', 'lunch', 'dinner', 'snack']
-const EMPTY_FORM  = { name: '', calories: '', meal_time: 'breakfast' }
+const EMPTY_FORM  = { name: '', calories: '', meal_time: 'breakfast', protein: '', carbs: '', fat: '' }
 const TAG_GROUPS  = [
   { label: 'Tags',    type: 'primary'     },
   { label: 'Dietary', type: 'restriction' },
@@ -343,8 +343,9 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
   const [allTags,     setAllTags]     = useState([])
   const [selectedIds, setSelectedIds] = useState(new Set())
 
-  // ── quick mode ────────────────────────────────────────────────────────────
-  const [qForm, setQForm] = useState(EMPTY_FORM)
+  // ── manual mode ───────────────────────────────────────────────────────────
+  const [qForm,      setQForm]      = useState(EMPTY_FORM)
+  const [calManual,  setCalManual]  = useState(false)  // true when user overrides auto-calc
 
   // ── ingredients mode ──────────────────────────────────────────────────────
   const [ingName,        setIngName]        = useState('')
@@ -488,16 +489,19 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
 
   // ── submit handlers ───────────────────────────────────────────────────────
 
-  async function handleQuickSubmit(e) {
+  async function handleManualSubmit(e) {
     e.preventDefault()
     setError(null)
     setSaving(true)
     try {
       await onAddMeal({
         name:      qForm.name.trim(),
-        calories:  parseInt(qForm.calories, 10),
+        calories:  parseInt(qForm.calories, 10) || 0,
         meal_time: qForm.meal_time,
         tag_ids:   [...selectedIds],
+        protein_g: qForm.protein !== '' ? parseFloat(qForm.protein) : null,
+        carbs_g:   qForm.carbs   !== '' ? parseFloat(qForm.carbs)   : null,
+        fat_g:     qForm.fat     !== '' ? parseFloat(qForm.fat)     : null,
       })
       onClose()
     } catch (err) {
@@ -534,7 +538,7 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
     }
   }
 
-  const canSubmit = mode === 'quick'
+  const canSubmit = mode === 'manual'
     ? (!!qForm.name.trim() && !!qForm.calories)
     : (!!ingName.trim() && ingredients.length > 0)
 
@@ -569,7 +573,7 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
         {/* Mode toggle */}
         <div className="px-6 pb-3 flex-shrink-0">
           <div className="flex bg-[#F5EFE0] rounded-xl p-0.5">
-            {[['ingredients', 'Ingredients'], ['barcode', 'Barcode'], ['quick', 'Quick']].map(([m, label]) => (
+            {[['ingredients', 'Ingredients'], ['manual', 'Manual'], ['barcode', 'Barcode']].map(([m, label]) => (
               <button
                 key={m}
                 type="button"
@@ -581,6 +585,7 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
                   setBarcodeError(null)
                   setScannerActive(false)
                   setCameraError(null)
+                  setCalManual(false)
                 }}
                 className={`flex-1 py-1.5 text-sm font-semibold rounded-[10px] transition-colors
                             ${mode === m
@@ -826,11 +831,11 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
           </form>
         )}
 
-        {/* ── Quick mode body ── */}
-        {mode === 'quick' && (
+        {/* ── Manual mode body ── */}
+        {mode === 'manual' && (
           <form
             id="meal-form"
-            onSubmit={handleQuickSubmit}
+            onSubmit={handleManualSubmit}
             className="flex-1 overflow-y-auto px-6 space-y-4 pb-2"
           >
             <div>
@@ -843,24 +848,61 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
                 autoFocus
                 value={qForm.name}
                 onChange={e => setQForm(p => ({ ...p, name: e.target.value }))}
-                placeholder="e.g. Salmon rice bowl"
+                placeholder="e.g. Chipotle burrito bowl"
                 className={inputClass}
               />
             </div>
 
+            {/* Macro inputs */}
+            <div className="flex gap-2">
+              {[
+                { label: 'Protein (g)', key: 'protein', ph: '40' },
+                { label: 'Carbs (g)',   key: 'carbs',   ph: '60' },
+                { label: 'Fat (g)',     key: 'fat',     ph: '20' },
+              ].map(({ label, key, ph }) => (
+                <div key={key} className="flex-1">
+                  <label className="block text-xs text-[#6B7B8C] uppercase tracking-wide font-semibold mb-1.5">
+                    {label}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value={qForm[key]}
+                    onChange={e => {
+                      const next = { ...qForm, [key]: e.target.value }
+                      if (!calManual) {
+                        const p = parseFloat(key === 'protein' ? e.target.value : qForm.protein) || 0
+                        const c = parseFloat(key === 'carbs'   ? e.target.value : qForm.carbs)   || 0
+                        const f = parseFloat(key === 'fat'     ? e.target.value : qForm.fat)     || 0
+                        const auto = Math.round(p * 4 + c * 4 + f * 9)
+                        next.calories = auto > 0 ? String(auto) : ''
+                      }
+                      setQForm(next)
+                    }}
+                    placeholder={ph}
+                    className={inputClass}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Calories (auto-calc, overridable) + meal time */}
             <div className="flex gap-3">
               <div className="flex-1">
                 <label className="block text-xs text-[#6B7B8C] uppercase tracking-wide font-semibold mb-1.5">
-                  Calories
+                  Calories (kcal)
                 </label>
                 <input
                   type="number"
                   required
-                  min="1"
-                  max="9999"
+                  min="0"
                   value={qForm.calories}
-                  onChange={e => setQForm(p => ({ ...p, calories: e.target.value }))}
-                  placeholder="650"
+                  onChange={e => {
+                    setCalManual(true)
+                    setQForm(p => ({ ...p, calories: e.target.value }))
+                  }}
+                  placeholder="auto"
                   className={inputClass}
                 />
               </div>

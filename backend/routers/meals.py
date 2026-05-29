@@ -19,6 +19,9 @@ class MealCreate(BaseModel):
     calories:  int
     meal_time: Literal["breakfast", "lunch", "dinner", "snack"]
     tag_ids:   list[int] = []
+    protein_g: float | None = None
+    carbs_g:   float | None = None
+    fat_g:     float | None = None
 
 
 class Per100g(BaseModel):
@@ -61,6 +64,9 @@ def create_meal(
         name=body.name,
         calories=body.calories,
         meal_time=body.meal_time,
+        protein_g=body.protein_g,
+        carbs_g=body.carbs_g,
+        fat_g=body.fat_g,
     )
     db.add(meal)
     db.flush()  # assigns meal.id without committing yet
