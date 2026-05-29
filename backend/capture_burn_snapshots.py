@@ -55,6 +55,23 @@ async def main() -> None:
                 skipped += 1
                 continue
 
+            # Dedup: skip if the most recent snapshot for this user+date already
+            # has the same value (stale Whoop reading — phone offline, no new sync).
+            last = (
+                db.query(BurnSnapshot)
+                .filter(BurnSnapshot.user_id == user.id, BurnSnapshot.date == today)
+                .order_by(BurnSnapshot.recorded_at.desc(), BurnSnapshot.id.desc())
+                .first()
+            )
+            if last is not None and last.burned_kcal == burned:
+                print(
+                    f"   [skip] user_id={user.id} {today}: burn unchanged at "
+                    f"{burned} kcal — stale reading, not inserting",
+                    flush=True,
+                )
+                skipped += 1
+                continue
+
             db.add(BurnSnapshot(
                 user_id     = user.id,
                 date        = today,
