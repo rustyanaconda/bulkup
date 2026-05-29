@@ -158,7 +158,8 @@ class Food(Base):
     name     = Column(String,  nullable=False, index=True)
     category = Column(String,  nullable=True)   # protein, grain, vegetable, fruit, dairy, fat, other
     fdc_id   = Column(Integer, nullable=True)   # USDA source id
-    source   = Column(String,  default="manual") # 'usda' or 'manual'
+    barcode  = Column(String,  nullable=True,  index=True, unique=True)  # UPC/EAN from barcode scan
+    source   = Column(String,  default="manual") # 'usda', 'manual', or 'edamam'
 
     # Macros per 100g
     calories        = Column(Float, nullable=True)
