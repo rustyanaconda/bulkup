@@ -29,7 +29,8 @@ class Per100g(BaseModel):
 
 
 class IngredientIn(BaseModel):
-    fdc_id:      int
+    fdc_id:      int | None = None  # null for Edamam/barcode scanned items
+    food_id:     int | None = None  # our internal foods.id for curated/scanned items
     description: str
     per_100g:    Per100g
     quantity:    float

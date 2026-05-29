@@ -285,6 +285,11 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
   const [ingredients,          setIngredients]          = useState([])
   const [showIngredientSearch, setShowIngredientSearch] = useState(false)
 
+  // ── barcode mode ──────────────────────────────────────────────────────────
+  const [barcodeInput,   setBarcodeInput]   = useState('')
+  const [barcodeLoading, setBarcodeLoading] = useState(false)
+  const [barcodeError,   setBarcodeError]   = useState(null)
+
   useEffect(() => {
     authFetch('/meals/tags')
       .then(r => r.json())
@@ -334,12 +339,41 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
     setSearchResults([])
   }
 
+  async function lookupBarcode() {
+    const code = barcodeInput.trim()
+    if (!code) return
+    setBarcodeLoading(true)
+    setBarcodeError(null)
+    setPendingFood(null)
+    try {
+      const res = await authFetch(`/foods/barcode/${encodeURIComponent(code)}`)
+      if (res.status === 404) {
+        setBarcodeError('No product found for that barcode.')
+        return
+      }
+      if (!res.ok) {
+        setBarcodeError('Something went wrong. Please try again.')
+        return
+      }
+      const food = await res.json()
+      const defaultIdx = (food.portions ?? []).findIndex(p => p.is_default)
+      setPendingFood(food)
+      setPendingQty('1')
+      setPendingPortion(defaultIdx >= 0 ? defaultIdx : 0)
+    } catch {
+      setBarcodeError('Could not reach the server.')
+    } finally {
+      setBarcodeLoading(false)
+    }
+  }
+
   function confirmAddIngredient() {
     if (!pendingFood) return
     const portion = pendingFood.portions[pendingPortion]
     setIngredients(prev => [...prev, {
-      fdc_id:      pendingFood.fdc_id,
-      description: pendingFood.name,
+      fdc_id:      pendingFood.fdc_id ?? null,
+      food_id:     pendingFood.id     ?? null,
+      description: pendingFood.name ?? pendingFood.description,
       per_100g: {
         calories:  pendingFood.calories,
         protein_g: pendingFood.protein_g,
@@ -350,11 +384,17 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
       unit:        portion.label,
       gram_weight: portion.grams,
     }])
-    // Collapse search panel after adding — user sees updated list with dashed button
-    setShowIngredientSearch(false)
     setPendingFood(null)
-    setSearchQuery('')
-    setSearchResults([])
+    setPendingQty('1')
+    setPendingPortion(0)
+    if (mode === 'ingredients') {
+      setShowIngredientSearch(false)
+      setSearchQuery('')
+      setSearchResults([])
+    } else if (mode === 'barcode') {
+      setBarcodeInput('')
+      setBarcodeError(null)
+    }
   }
 
   function removeIngredient(idx) {
@@ -454,11 +494,17 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
         {/* Mode toggle */}
         <div className="px-6 pb-3 flex-shrink-0">
           <div className="flex bg-[#F5EFE0] rounded-xl p-0.5">
-            {[['ingredients', 'Ingredients'], ['quick', 'Quick']].map(([m, label]) => (
+            {[['ingredients', 'Ingredients'], ['barcode', 'Barcode'], ['quick', 'Quick']].map(([m, label]) => (
               <button
                 key={m}
                 type="button"
-                onClick={() => { setMode(m); setError(null) }}
+                onClick={() => {
+                  setMode(m)
+                  setError(null)
+                  setPendingFood(null)
+                  setBarcodeInput('')
+                  setBarcodeError(null)
+                }}
                 className={`flex-1 py-1.5 text-sm font-semibold rounded-[10px] transition-colors
                             ${mode === m
                               ? 'bg-white text-[#1A2E45] shadow-sm'
@@ -469,6 +515,194 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
             ))}
           </div>
         </div>
+
+        {/* ── Barcode mode body ── */}
+        {mode === 'barcode' && (
+          <form
+            id="meal-form"
+            onSubmit={handleIngredientsSubmit}
+            className="flex-1 overflow-y-auto px-6 space-y-4 pb-2"
+          >
+            {/* Meal name + time (shared with ingredients mode) */}
+            <div className="flex gap-3">
+              <div className="flex-[2]">
+                <label className="block text-xs text-[#6B7B8C] uppercase tracking-wide font-semibold mb-1.5">
+                  Meal name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={ingName}
+                  onChange={e => setIngName(e.target.value)}
+                  placeholder="e.g. Protein bar + coffee"
+                  className={inputClass}
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs text-[#6B7B8C] uppercase tracking-wide font-semibold mb-1.5">
+                  Time
+                </label>
+                <select
+                  value={ingMealTime}
+                  onChange={e => setIngMealTime(e.target.value)}
+                  className={`${inputClass} capitalize`}
+                >
+                  {MEAL_TIMES.map(t => (
+                    <option key={t} value={t} className="capitalize">{t}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Ingredient list — shared with ingredients mode */}
+            {ingredients.length > 0 && (
+              <div className="space-y-1.5">
+                {ingredients.map((ing, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-2 bg-[#F5EFE0] rounded-xl
+                               px-3 py-2.5 border border-[#E3DBC9]"
+                  >
+                    <span className="text-sm text-[#1A2E45] flex-1 truncate">
+                      {ing.quantity} {ing.unit} · {ing.description}
+                    </span>
+                    <span className="text-xs text-[#6B7B8C] font-medium flex-shrink-0">
+                      {calcIngCals(ing)} cal
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeIngredient(idx)}
+                      className="w-5 h-5 flex items-center justify-center rounded-full
+                                 bg-[#E3DBC9] text-[#A89F88] hover:bg-[#D4CDB9]
+                                 text-[10px] font-bold flex-shrink-0 transition-colors"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Running totals */}
+            {ingredients.length > 0 && (
+              <div className="bg-[#1A2E45]/5 rounded-xl px-3 py-2.5 -mt-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-[#1A2E45]">Total</span>
+                  <span className="text-sm font-bold text-[#1A2E45]">{totalCals} kcal</span>
+                </div>
+                <p className="text-xs text-[#6B7B8C] mt-0.5">
+                  {totalProtein}g protein · {totalCarbs}g carbs · {totalFat}g fat
+                </p>
+              </div>
+            )}
+
+            {/* Barcode input OR portion picker */}
+            {!pendingFood ? (
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={barcodeInput}
+                    onChange={e => { setBarcodeInput(e.target.value); setBarcodeError(null) }}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); lookupBarcode() } }}
+                    placeholder="Enter barcode number…"
+                    className={`${inputClass} flex-1`}
+                  />
+                  <button
+                    type="button"
+                    onClick={lookupBarcode}
+                    disabled={!barcodeInput.trim() || barcodeLoading}
+                    className="px-4 py-2.5 rounded-xl bg-[#1A2E45] hover:bg-[#152639]
+                               disabled:opacity-40 text-white text-sm font-semibold
+                               transition-colors flex-shrink-0"
+                  >
+                    {barcodeLoading ? '…' : 'Look up'}
+                  </button>
+                </div>
+                {barcodeError && (
+                  <p className="text-sm text-[#A32D2D] bg-[#A32D2D]/10 rounded-xl px-3 py-2">
+                    {barcodeError}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="bg-[#F5EFE0] rounded-2xl border border-[#E3DBC9] p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-[10px] text-[#A89F88] font-semibold uppercase tracking-wide">
+                      Adding
+                    </p>
+                    <p className="text-sm font-semibold text-[#1A2E45] mt-0.5 leading-snug">
+                      {pendingFood.name ?? pendingFood.description}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setPendingFood(null); setBarcodeInput('') }}
+                    className="text-[#A89F88] hover:text-[#6B7B8C] text-xs flex-shrink-0 mt-0.5"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="flex gap-2">
+                  <div className="w-20 flex-shrink-0">
+                    <label className="block text-xs text-[#6B7B8C] font-semibold mb-1">Qty</label>
+                    <input
+                      type="number"
+                      min="0.1"
+                      step="0.1"
+                      value={pendingQty}
+                      onChange={e => setPendingQty(e.target.value)}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs text-[#6B7B8C] font-semibold mb-1">Portion</label>
+                    <select
+                      value={pendingPortion}
+                      onChange={e => setPendingPortion(Number(e.target.value))}
+                      className={inputClass}
+                    >
+                      {(pendingFood.portions ?? []).map((p, i) => (
+                        <option key={i} value={i}>{p.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Live calorie preview */}
+                {(() => {
+                  const portion = (pendingFood.portions ?? [])[pendingPortion]
+                  if (!portion) return null
+                  const grams = (parseFloat(pendingQty) || 0) * portion.grams
+                  const cals  = pendingFood.calories != null
+                    ? Math.round(pendingFood.calories * grams / 100) : null
+                  return cals != null ? (
+                    <p className="text-xs text-[#6B7B8C]">≈ {Math.round(grams)}g · {cals} kcal</p>
+                  ) : null
+                })()}
+
+                <button
+                  type="button"
+                  onClick={confirmAddIngredient}
+                  className="w-full py-2 rounded-xl bg-[#1A2E45] hover:bg-[#152639]
+                             text-white text-sm font-semibold transition-colors"
+                >
+                  + Add ingredient
+                </button>
+              </div>
+            )}
+
+            <TagPicker allTags={allTags} selectedIds={selectedIds} onToggle={toggleTag} />
+
+            {error && (
+              <p className="text-sm text-[#A32D2D] bg-[#A32D2D]/10 rounded-xl px-3 py-2">
+                {error}
+              </p>
+            )}
+          </form>
+        )}
 
         {/* ── Quick mode body ── */}
         {mode === 'quick' && (

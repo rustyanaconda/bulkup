@@ -130,7 +130,7 @@ class MealIngredient(Base):
 
     id          = Column(Integer, primary_key=True, index=True)
     meal_id     = Column(Integer, ForeignKey("meals.id"), nullable=False)
-    fdc_id      = Column(Integer, nullable=False)
+    fdc_id      = Column(Integer, nullable=True)   # null for Edamam/barcode scanned items
     description = Column(String,  nullable=False)
     quantity    = Column(Float,   nullable=False)
     unit        = Column(String,  nullable=False)
