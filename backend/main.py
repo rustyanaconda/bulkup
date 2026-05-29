@@ -7,7 +7,7 @@ Docs at:   http://localhost:8000/docs
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import meals, whoop, users, calories, auth, foods
+from routers import meals, whoop, users, calories, auth, foods, waitlist
 
 app = FastAPI(title="Mise API", version="0.1.0")
 
@@ -33,6 +33,7 @@ app.include_router(meals.router,    prefix="/meals",    tags=["meals"])
 app.include_router(calories.router, prefix="/calories", tags=["calories"])
 app.include_router(whoop.router,    prefix="/whoop",    tags=["whoop"])
 app.include_router(foods.router,    prefix="/foods",    tags=["foods"])
+app.include_router(waitlist.router, prefix="/waitlist", tags=["waitlist"])
 
 
 @app.get("/")

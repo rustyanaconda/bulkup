@@ -13,7 +13,7 @@ SQL equivalent of User:
         ...
     );
 """
-from sqlalchemy import Column, Integer, String, Float, Date, Enum, ForeignKey, DateTime, Table
+from sqlalchemy import Column, Integer, String, Float, Date, Enum, ForeignKey, DateTime, Table, text
 from sqlalchemy.orm import declarative_base, relationship
 from datetime import datetime
 import enum
@@ -219,6 +219,14 @@ class BurnSnapshot(Base):
     date        = Column(Date,     nullable=False)
     recorded_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     burned_kcal = Column(Integer,  nullable=True)
+
+
+class WaitlistSignup(Base):
+    __tablename__ = "waitlist_signups"
+
+    id         = Column(Integer,  primary_key=True, index=True)
+    email      = Column(String,   nullable=False, unique=True, index=True)
+    created_at = Column(DateTime, nullable=False, server_default=text("now()"))
 
 
 class Tag(Base):
