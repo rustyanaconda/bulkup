@@ -66,9 +66,18 @@ export function useMeals() {
     return meal
   }
 
+  async function deleteMeal(logId) {
+    setMeals(prev => prev.filter(m => m.id !== logId))
+    try {
+      await authFetch(`/meals/${logId}`, { method: 'DELETE' })
+    } catch {
+      fetchMeals()
+    }
+  }
+
   const eaten   = meals.reduce((sum, m) => m.state === 'done'                             ? sum + m.calories : sum, 0)
   const planned = meals.reduce((sum, m) => m.state === 'upcoming' || m.state === 'missed' ? sum + m.calories : sum, 0)
   const skipped = meals.reduce((sum, m) => m.state === 'skipped'                          ? sum + m.calories : sum, 0)
 
-  return { meals, loading, error, updateMealState, addMeal, addMealFromIngredients, eaten, planned, skipped }
+  return { meals, loading, error, updateMealState, deleteMeal, addMeal, addMealFromIngredients, eaten, planned, skipped }
 }

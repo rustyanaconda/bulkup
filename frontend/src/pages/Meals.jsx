@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Html5Qrcode, Html5QrcodeSupportedFormats, Html5QrcodeScannerState } from 'html5-qrcode'
-import { Search, Barcode, Pencil, Camera } from 'lucide-react'
+import { Search, Barcode, Pencil, Camera, Trash2 } from 'lucide-react'
 import { useMeals }    from '../hooks/useMeals'
 import { useCalories } from '../hooks/useCalories'
 import CalorieBar      from '../components/calories/CalorieBar'
@@ -95,8 +95,9 @@ function BarcodeScannerView({ onScan, onError }) {
 
 // ─── tier 1: compact rows (earlier today) ─────────────────────────────────────
 
-function CompactMealRow({ meal, onStateChange }) {
-  const [open, setOpen] = useState(false)
+function CompactMealRow({ meal, onStateChange, onDelete }) {
+  const [open,          setOpen]          = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const dot = {
     done:    'bg-[#2A5A3E]',
@@ -108,10 +109,12 @@ function CompactMealRow({ meal, onStateChange }) {
     ? 'line-through text-[#A89F88]'
     : 'text-[#6B7B8C]'
 
+  function close() { setOpen(false); setConfirmDelete(false) }
+
   return (
     <div className="mb-1">
       <div
-        onClick={() => setOpen(o => !o)}
+        onClick={() => { setOpen(o => !o); setConfirmDelete(false) }}
         className="flex items-center gap-2.5 px-3 py-2 rounded-xl cursor-pointer
                    hover:bg-[#EFE8D8] transition-colors"
       >
@@ -121,21 +124,48 @@ function CompactMealRow({ meal, onStateChange }) {
       </div>
 
       {open && (
-        <div className="flex gap-2 px-3 pb-1">
-          <button
-            onClick={() => { onStateChange(meal.id, 'upcoming'); setOpen(false) }}
-            className="text-xs px-3 py-1 rounded-lg border border-[#E3DBC9]
-                       text-[#6B7B8C] hover:bg-[#EFE8D8] transition-colors"
-          >
-            ↩ Undo
-          </button>
-          <button
-            onClick={() => setOpen(false)}
-            className="text-xs px-3 py-1 rounded-lg text-[#A89F88]
-                       hover:text-[#6B7B8C] transition-colors"
-          >
-            Cancel
-          </button>
+        <div className="flex items-center gap-2 px-3 pb-1">
+          {confirmDelete ? (
+            <>
+              <span className="text-xs text-[#A32D2D] flex-1">Delete this meal?</span>
+              <button
+                onClick={() => { onDelete(meal.id); close() }}
+                className="text-xs px-3 py-1 rounded-lg bg-[#A32D2D]/10 text-[#A32D2D]
+                           hover:bg-[#A32D2D]/20 font-semibold transition-colors"
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="text-xs px-3 py-1 rounded-lg text-[#A89F88] hover:text-[#6B7B8C] transition-colors"
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => { onStateChange(meal.id, 'upcoming'); close() }}
+                className="text-xs px-3 py-1 rounded-lg border border-[#E3DBC9]
+                           text-[#6B7B8C] hover:bg-[#EFE8D8] transition-colors"
+              >
+                ↩ Undo
+              </button>
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="text-xs px-3 py-1 rounded-lg text-[#A32D2D]/50
+                           hover:text-[#A32D2D] transition-colors flex items-center gap-1"
+              >
+                <Trash2 size={11} strokeWidth={1.75} /> Delete
+              </button>
+              <button
+                onClick={close}
+                className="text-xs px-3 py-1 rounded-lg text-[#A89F88] hover:text-[#6B7B8C] transition-colors"
+              >
+                Cancel
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -144,7 +174,8 @@ function CompactMealRow({ meal, onStateChange }) {
 
 // ─── tier 2: hero card (up next) ──────────────────────────────────────────────
 
-function HeroMealCard({ meal, onStateChange }) {
+function HeroMealCard({ meal, onStateChange, onDelete }) {
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const visibleTags = (meal.tags ?? []).filter(
     t => t.tag_type === 'primary' || t.tag_type === 'restriction'
   )
@@ -200,6 +231,33 @@ function HeroMealCard({ meal, onStateChange }) {
             Skip
           </button>
         </div>
+
+        {confirmDelete ? (
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-xs text-[#A32D2D] flex-1">Delete this meal?</span>
+            <button
+              onClick={() => onDelete(meal.id)}
+              className="text-xs px-3 py-1 rounded-lg bg-[#A32D2D]/10 text-[#A32D2D]
+                         hover:bg-[#A32D2D]/20 font-semibold transition-colors"
+            >
+              Delete
+            </button>
+            <button
+              onClick={() => setConfirmDelete(false)}
+              className="text-xs px-3 py-1 rounded-lg text-[#A89F88] hover:text-[#6B7B8C] transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            className="mt-2 flex items-center gap-1 text-xs text-[#A89F88]/60
+                       hover:text-[#A32D2D]/60 transition-colors"
+          >
+            <Trash2 size={12} strokeWidth={1.75} /> Delete meal
+          </button>
+        )}
       </div>
     </div>
   )
@@ -207,8 +265,11 @@ function HeroMealCard({ meal, onStateChange }) {
 
 // ─── tier 3: medium cards (later) ─────────────────────────────────────────────
 
-function LaterMealCard({ meal, onStateChange }) {
-  const [open, setOpen] = useState(false)
+function LaterMealCard({ meal, onStateChange, onDelete }) {
+  const [open,          setOpen]          = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  function close() { setOpen(false); setConfirmDelete(false) }
 
   const visibleTags = (meal.tags ?? []).filter(
     t => t.tag_type === 'primary' || t.tag_type === 'restriction'
@@ -249,21 +310,47 @@ function LaterMealCard({ meal, onStateChange }) {
 
       {open && (
         <div className="mt-1 bg-[#F5EFE0] rounded-xl border border-[#E3DBC9] overflow-hidden">
-          <ActionRow
-            icon="✓" iconColor="text-[#2A5A3E]"
-            label="Mark as eaten" sub="Log it as done"
-            onClick={() => { onStateChange(meal.id, 'done');    setOpen(false) }}
-          />
-          <ActionRow
-            icon="✕" iconColor="text-[#A32D2D]"
-            label="Skip" sub={`${meal.calories} kcal redistributed`}
-            onClick={() => { onStateChange(meal.id, 'skipped'); setOpen(false) }}
-          />
-          <ActionRow
-            icon="✕" iconColor="text-[#A89F88]"
-            label="Cancel" sub=""
-            onClick={() => setOpen(false)}
-          />
+          {confirmDelete ? (
+            <div className="flex items-center gap-3 px-4 py-3">
+              <span className="text-sm text-[#A32D2D] flex-1">Delete this meal?</span>
+              <button
+                onClick={() => { onDelete(meal.id); close() }}
+                className="text-sm font-semibold text-[#A32D2D] px-3 py-1 rounded-lg
+                           bg-[#A32D2D]/10 hover:bg-[#A32D2D]/20 transition-colors"
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="text-sm text-[#6B7B8C] hover:text-[#1A2E45] transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <>
+              <ActionRow
+                icon="✓" iconColor="text-[#2A5A3E]"
+                label="Mark as eaten" sub="Log it as done"
+                onClick={() => { onStateChange(meal.id, 'done'); close() }}
+              />
+              <ActionRow
+                icon="✕" iconColor="text-[#A32D2D]"
+                label="Skip" sub={`${meal.calories} kcal redistributed`}
+                onClick={() => { onStateChange(meal.id, 'skipped'); close() }}
+              />
+              <ActionRow
+                icon={<Trash2 size={14} strokeWidth={1.75} />} iconColor="text-[#A89F88]"
+                label="Delete" sub=""
+                onClick={() => setConfirmDelete(true)}
+              />
+              <ActionRow
+                icon="✕" iconColor="text-[#A89F88]"
+                label="Cancel" sub=""
+                onClick={close}
+              />
+            </>
+          )}
         </div>
       )}
     </div>
@@ -1196,7 +1283,7 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
 // ─── main page ────────────────────────────────────────────────────────────────
 
 export default function Meals() {
-  const { meals, loading, error, updateMealState, addMeal, addMealFromIngredients, eaten, planned } = useMeals()
+  const { meals, loading, error, updateMealState, deleteMeal, addMeal, addMealFromIngredients, eaten, planned } = useMeals()
   const { target, loading: calLoading } = useCalories()
   const [showModal, setShowModal] = useState(false)
 
@@ -1251,7 +1338,7 @@ export default function Meals() {
             <div className="mb-5">
               <SectionLabel>Earlier today</SectionLabel>
               {earlierMeals.map(meal => (
-                <CompactMealRow key={meal.id} meal={meal} onStateChange={updateMealState} />
+                <CompactMealRow key={meal.id} meal={meal} onStateChange={updateMealState} onDelete={deleteMeal} />
               ))}
             </div>
           )}
@@ -1260,7 +1347,7 @@ export default function Meals() {
           {heroMeal && (
             <div className="mb-5">
               <SectionLabel>Up next</SectionLabel>
-              <HeroMealCard meal={heroMeal} onStateChange={updateMealState} />
+              <HeroMealCard meal={heroMeal} onStateChange={updateMealState} onDelete={deleteMeal} />
             </div>
           )}
 
@@ -1269,7 +1356,7 @@ export default function Meals() {
             <div className="mb-5">
               <SectionLabel>Later</SectionLabel>
               {laterMeals.map(meal => (
-                <LaterMealCard key={meal.id} meal={meal} onStateChange={updateMealState} />
+                <LaterMealCard key={meal.id} meal={meal} onStateChange={updateMealState} onDelete={deleteMeal} />
               ))}
             </div>
           )}
