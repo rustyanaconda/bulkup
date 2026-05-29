@@ -5,7 +5,7 @@ import { authFetch }           from '../utils/api'
 import { useAuth }             from '../context/AuthContext'
 
 export default function Profile() {
-  const { breakdown, whoopConnected } = useCalories()
+  const { benchmark, whoop } = useCalories()
   const { logout } = useAuth()
   const navigate   = useNavigate()
 
@@ -14,15 +14,9 @@ export default function Profile() {
     navigate('/login')
   }
 
-  const [connected,       setConnected]       = useState(false)
-  const [credentialsSet,  setCredentialsSet]  = useState(false)
-  const [connecting,      setConnecting]      = useState(false)
-  const [connectError,    setConnectError]    = useState(null)
-
-  const [clientId,        setClientId]        = useState('')
-  const [clientSecret,    setClientSecret]    = useState('')
-  const [savingCreds,     setSavingCreds]     = useState(false)
-  const [credsError,      setCredsError]      = useState(null)
+  const [connected,    setConnected]    = useState(false)
+  const [connecting,   setConnecting]   = useState(false)
+  const [connectError, setConnectError] = useState(null)
 
   useEffect(() => {
     async function checkStatus() {
@@ -30,33 +24,10 @@ export default function Profile() {
         const res = await authFetch('/whoop/status')
         const d   = await res.json()
         setConnected(d.connected)
-        setCredentialsSet(d.credentials_set)
       } catch {}
     }
     checkStatus()
   }, [])
-
-  async function handleSaveCredentials() {
-    setSavingCreds(true)
-    setCredsError(null)
-    try {
-      const redirectUri = `${window.location.origin}/whoop/callback`
-      const res = await authFetch('/whoop/credentials', {
-        method: 'POST',
-        body:   JSON.stringify({
-          client_id:     clientId.trim(),
-          client_secret: clientSecret.trim(),
-          redirect_uri:  redirectUri,
-        }),
-      })
-      if (!res.ok) throw new Error(`Server returned ${res.status}`)
-      setCredentialsSet(true)
-    } catch (err) {
-      if (err.message !== 'Unauthorized') setCredsError(err.message)
-    } finally {
-      setSavingCreds(false)
-    }
-  }
 
   async function handleConnectWhoop() {
     setConnecting(true)
@@ -74,10 +45,6 @@ export default function Profile() {
       }
     }
   }
-
-  const inputClass = `w-full bg-[#F5EFE0] border border-[#E3DBC9] rounded-xl px-3 py-2.5
-                      text-sm text-[#1A2E45] placeholder-[#A89F88] focus:outline-none
-                      focus:border-[#1A2E45]`
 
   return (
     <div className="p-4 pb-24">
@@ -106,16 +73,16 @@ export default function Profile() {
       </div>
 
       {/* TDEE breakdown */}
-      {breakdown && (
+      {benchmark && (
         <div className="bg-white rounded-2xl p-4 border border-[#E3DBC9] mb-4">
           <p className="text-xs text-[#6B7B8C] uppercase tracking-wide font-semibold mb-3">
-            Today's Target ({breakdown.source === 'whoop' ? 'Whoop-powered' : 'estimated'})
+            Today's Target
           </p>
           <div className="space-y-2">
             {[
-              { label: 'BMR',      value: breakdown.bmr      },
-              { label: 'Activity', value: breakdown.activity  },
-              { label: 'Surplus',  value: breakdown.surplus   },
+              { label: 'BMR',      value: benchmark.bmr      },
+              { label: 'Activity', value: benchmark.activity  },
+              { label: 'Surplus',  value: benchmark.surplus   },
             ].map(({ label, value }) => (
               <div key={label} className="flex justify-between text-sm">
                 <span className="text-[#6B7B8C]">{label}</span>
@@ -124,77 +91,33 @@ export default function Profile() {
             ))}
             <div className="border-t border-[#E3DBC9] pt-2 flex justify-between text-sm">
               <span className="text-[#1A2E45] font-semibold">Total target</span>
-              <span className="text-[#1A2E45] font-bold">{breakdown.target.toLocaleString()} kcal</span>
+              <span className="text-[#1A2E45] font-bold">{benchmark.target.toLocaleString()} kcal</span>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Whoop section ─────────────────────────────────────── */}
+      {/* Whoop section */}
       <div className="bg-white rounded-2xl p-4 border border-[#E3DBC9]">
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs text-[#6B7B8C] uppercase tracking-wide font-semibold">Whoop</p>
           <div className={`flex items-center gap-1.5 text-xs font-semibold
                            ${connected ? 'text-[#2A5A3E]' : 'text-[#6B7B8C]'}`}>
-            <div className={`w-1.5 h-1.5 rounded-full
-                             ${connected ? 'bg-[#2A5A3E]' : 'bg-[#D4CDB9]'}`} />
-            {connected ? 'Connected' : credentialsSet ? 'Not connected' : 'Setup required'}
+            <div className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-[#2A5A3E]' : 'bg-[#D4CDB9]'}`} />
+            {connected ? 'Connected' : 'Not connected'}
           </div>
         </div>
 
-        {/* State 1 — no credentials yet */}
-        {!credentialsSet && !connected && (
+        {connected ? (
+          <p className="text-xs text-[#6B7B8C]">
+            Calorie burn is being pulled from your Whoop automatically.
+            {!whoop.connected && ' Wear your Whoop today for live data.'}
+          </p>
+        ) : (
           <>
-            <p className="text-xs text-[#6B7B8C] mb-1">
-              Get your credentials from{' '}
-              <a
-                href="https://developer-dashboard.whoop.com"
-                target="_blank"
-                rel="noreferrer"
-                className="text-[#1A2E45] underline"
-              >
-                developer-dashboard.whoop.com
-              </a>
-              . When creating your Whoop app, set the Redirect URI to:
+            <p className="text-sm text-[#6B7B8C] mb-3">
+              Connect your Whoop to power your calorie targets with real burn data.
             </p>
-            <p className="text-[10px] font-mono text-[#1A2E45] bg-[#EFE8D8] rounded-lg px-3 py-2 mb-3 break-all">
-              {window.location.origin}/whoop/callback
-            </p>
-
-            <div className="space-y-2 mb-3">
-              <input
-                type="text"
-                placeholder="Client ID"
-                value={clientId}
-                onChange={e => setClientId(e.target.value)}
-                className={inputClass}
-              />
-              <input
-                type="password"
-                placeholder="Client Secret"
-                value={clientSecret}
-                onChange={e => setClientSecret(e.target.value)}
-                className={inputClass}
-              />
-            </div>
-
-            <button
-              onClick={handleSaveCredentials}
-              disabled={savingCreds || !clientId || !clientSecret}
-              className="w-full py-3 rounded-xl bg-[#1A2E45] hover:bg-[#152639]
-                         disabled:opacity-40 text-white text-sm font-semibold transition-colors"
-            >
-              {savingCreds ? 'Saving…' : 'Save credentials'}
-            </button>
-            {credsError && (
-              <p className="mt-2 text-xs text-[#A32D2D]">{credsError}</p>
-            )}
-          </>
-        )}
-
-        {/* State 2 — credentials saved, not yet OAuth'd */}
-        {credentialsSet && !connected && (
-          <>
             <button
               onClick={handleConnectWhoop}
               disabled={connecting}
@@ -206,21 +129,7 @@ export default function Profile() {
             {connectError && (
               <p className="mt-3 text-xs text-[#A32D2D] break-all">{connectError}</p>
             )}
-            <button
-              onClick={() => { setCredentialsSet(false); setClientId(''); setClientSecret('') }}
-              className="mt-2 w-full py-2 text-xs text-[#6B7B8C] hover:text-[#1A2E45] transition-colors"
-            >
-              Re-enter credentials
-            </button>
           </>
-        )}
-
-        {/* State 3 — connected */}
-        {connected && (
-          <p className="text-xs text-[#6B7B8C]">
-            Calorie burn is being pulled from your Whoop automatically.
-            {!whoopConnected && ' Wear your Whoop today for live data.'}
-          </p>
         )}
       </div>
 
