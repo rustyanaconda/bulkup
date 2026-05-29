@@ -1,8 +1,15 @@
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
+// Paths where a 401 means the session token itself is invalid/expired.
+// Only these trigger a hard redirect to /login.
+const AUTH_PATHS = ['/auth/', '/users/me']
+
 /**
- * Fetch wrapper that adds the JWT auth header and redirects to /login on 401.
- * Use this for every backend call that requires authentication.
+ * Fetch wrapper that adds the JWT auth header.
+ * On 401: throws Error('Unauthorized') so callers can handle it.
+ * Only hard-redirects to /login when the 401 comes from an auth-identity
+ * endpoint — feature endpoints (Whoop, calories, etc.) just throw so the
+ * page can render normally with that feature showing as unavailable.
  */
 export async function authFetch(path, options = {}) {
   const token = localStorage.getItem('mise_token')
@@ -17,7 +24,10 @@ export async function authFetch(path, options = {}) {
   })
 
   if (res.status === 401) {
-    window.location.href = '/login'
+    const isAuthPath = AUTH_PATHS.some(p => path.startsWith(p))
+    if (isAuthPath) {
+      window.location.href = '/login'
+    }
     throw new Error('Unauthorized')
   }
 
