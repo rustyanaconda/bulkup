@@ -62,20 +62,8 @@ function BarcodeScannerView({ onScan, onError }) {
 
     scanner
       .start(
-        {
-          facingMode: 'environment',
-          width:      { ideal: 1920 },
-          height:     { ideal: 1080 },
-        },
-        {
-          fps:              10,
-          qrbox:            (vw, vh) => {
-            const m = Math.min(vw, vh)
-            const w = Math.floor(m * 0.8)
-            return { width: w, height: Math.floor(w * 0.6) }
-          },
-          formatsToSupport: BARCODE_FORMATS,
-        },
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 260, height: 100 }, formatsToSupport: BARCODE_FORMATS },
         (code) => {
           // Successful decode — safe-stop then hand off the code
           safeStop(scanner)
