@@ -81,6 +81,61 @@ def _log_meal(db: Session, meal: Meal, user_id: int) -> MealLog:
     return log
 
 
+class LogSavedMealRequest(BaseModel):
+    meal_id: int
+
+
+@router.post("/log", status_code=201)
+def log_saved_meal(
+    body: LogSavedMealRequest,
+    user: User    = Depends(get_current_user),
+    db:   Session = Depends(get_db),
+):
+    """Re-log an existing saved Meal by id. Snapshots all calories + macros."""
+    meal = db.query(Meal).filter(
+        Meal.id == body.meal_id, Meal.user_id == user.id
+    ).first()
+    if meal is None:
+        raise HTTPException(status_code=404, detail="Saved meal not found")
+
+    log = _log_meal(db, meal, user.id)
+    db.commit()
+    db.refresh(log)
+    db.refresh(meal)
+
+    return {
+        "id":        log.id,
+        "name":      meal.name,
+        "calories":  log.calories_logged,
+        "meal_time": meal.meal_time,
+        "state":     log.state.value,
+        "tags":      [{"id": t.id, "name": t.name, "slug": t.slug,
+                       "tag_type": t.tag_type} for t in meal.tags],
+    }
+
+
+@router.delete("/saved/{meal_id}", status_code=200)
+def delete_saved_meal(
+    meal_id: int,
+    user:    User    = Depends(get_current_user),
+    db:      Session = Depends(get_db),
+):
+    """Delete a saved Meal template and all its child rows."""
+    meal = db.query(Meal).filter(
+        Meal.id == meal_id, Meal.user_id == user.id
+    ).first()
+    if meal is None:
+        raise HTTPException(status_code=404, detail="Saved meal not found")
+
+    # Delete child rows before the parent to satisfy FK constraints.
+    # meal_ingredients and meal_tags would cascade via ORM, but being
+    # explicit avoids surprises if cascade settings change.
+    db.query(MealLog).filter(MealLog.meal_id == meal_id).delete()
+    db.delete(meal)  # cascades meal_ingredients + meal_tags via ORM
+    db.commit()
+    return {"deleted": True, "id": meal_id}
+
+
 @router.get("/saved")
 def get_saved_meals(
     user: User    = Depends(get_current_user),

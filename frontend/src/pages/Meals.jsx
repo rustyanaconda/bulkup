@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Html5Qrcode, Html5QrcodeSupportedFormats, Html5QrcodeScannerState } from 'html5-qrcode'
-import { Search, Barcode, Pencil, Camera, Trash2 } from 'lucide-react'
+import { Search, Barcode, Pencil, Camera, Trash2, BookOpen } from 'lucide-react'
 import { useMeals }    from '../hooks/useMeals'
 import { useCalories } from '../hooks/useCalories'
 import CalorieBar      from '../components/calories/CalorieBar'
@@ -423,9 +423,9 @@ function TagPicker({ allTags, selectedIds, onToggle }) {
 
 // ─── add-meal modal ───────────────────────────────────────────────────────────
 
-function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
+function AddMealModal({ onClose, onAddMeal, onAddFromIngredients, onLogSavedMeal }) {
   // ── shared ────────────────────────────────────────────────────────────────
-  const [mode,        setMode]        = useState('ingredients')
+  const [mode,        setMode]        = useState('saved')
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState(null)
   const [allTags,     setAllTags]     = useState([])
@@ -453,6 +453,42 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
   const [barcodeError,   setBarcodeError]   = useState(null)
   const [scannerActive,  setScannerActive]  = useState(false)
   const [cameraError,    setCameraError]    = useState(null)
+
+  // ── "Your meals" mode ─────────────────────────────────────────────────────
+  const [savedMeals,       setSavedMeals]       = useState([])
+  const [savedLoading,     setSavedLoading]      = useState(false)
+  const [savedFilter,      setSavedFilter]       = useState('')
+  const [savingLog,        setSavingLog]         = useState(null)  // meal_id being logged
+  const [confirmDeleteId,  setConfirmDeleteId]   = useState(null)  // meal_id pending delete
+
+  useEffect(() => {
+    if (mode !== 'saved') return
+    setSavedLoading(true)
+    authFetch('/meals/saved')
+      .then(r => r.json())
+      .then(data => setSavedMeals(Array.isArray(data) ? data : []))
+      .catch(() => {})
+      .finally(() => setSavedLoading(false))
+  }, [mode])
+
+  async function handleLogSaved(meal) {
+    setSavingLog(meal.id)
+    try {
+      await onLogSavedMeal(meal.id)
+      onClose()
+    } catch {
+      setSavingLog(null)
+    }
+  }
+
+  async function handleDeleteSaved(mealId) {
+    try {
+      const res = await authFetch(`/meals/saved/${mealId}`, { method: 'DELETE' })
+      if (!res.ok) return
+      setSavedMeals(prev => prev.filter(m => m.id !== mealId))
+      setConfirmDeleteId(null)
+    } catch {}
+  }
 
   useEffect(() => {
     authFetch('/meals/tags')
@@ -626,7 +662,9 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
     }
   }
 
-  const canSubmit = mode === 'manual'
+  const canSubmit = mode === 'saved'
+    ? false  // saved mode uses inline "Add" buttons, not the footer button
+    : mode === 'manual'
     ? (!!qForm.name.trim() && !!qForm.calories)
     : (!!ingName.trim() && ingredients.length > 0)
 
@@ -662,9 +700,10 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
         <div className="px-6 pb-3 flex-shrink-0">
           <div className="flex bg-[#F5EFE0] rounded-xl p-0.5">
             {[
-              { mode: 'ingredients', label: 'Search', Icon: Search  },
-              { mode: 'barcode',     label: 'Scan',   Icon: Barcode },
-              { mode: 'manual',      label: 'Custom', Icon: Pencil  },
+              { mode: 'saved',       label: 'Yours',  Icon: BookOpen },
+              { mode: 'ingredients', label: 'Search', Icon: Search   },
+              { mode: 'barcode',     label: 'Scan',   Icon: Barcode  },
+              { mode: 'manual',      label: 'Custom', Icon: Pencil   },
             ].map(({ mode: m, label, Icon }) => (
               <button
                 key={m}
@@ -678,6 +717,7 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
                   setScannerActive(false)
                   setCameraError(null)
                   setCalManual(false)
+                  setConfirmDeleteId(null)
                 }}
                 className={`flex-1 py-1.5 rounded-[10px] transition-colors flex flex-col items-center gap-0.5
                             ${mode === m
@@ -690,6 +730,95 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
             ))}
           </div>
         </div>
+
+        {/* ── Your meals mode body ── */}
+        {mode === 'saved' && (
+          <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-3">
+            {/* Filter */}
+            <input
+              type="text"
+              value={savedFilter}
+              onChange={e => setSavedFilter(e.target.value)}
+              placeholder="Filter meals…"
+              className={`w-full bg-[#F5EFE0] border border-[#E3DBC9] rounded-xl px-3 py-2.5
+                          text-sm text-[#1A2E45] placeholder-[#A89F88] focus:outline-none
+                          focus:border-[#1A2E45]`}
+            />
+
+            {savedLoading && (
+              <p className="text-sm text-[#A89F88] text-center py-4">Loading…</p>
+            )}
+
+            {!savedLoading && savedMeals.length === 0 && (
+              <p className="text-sm text-[#A89F88] text-center py-4">
+                No saved meals yet — create one using Search, Scan, or Custom.
+              </p>
+            )}
+
+            {!savedLoading && savedMeals
+              .filter(m => !savedFilter.trim() ||
+                m.name.toLowerCase().includes(savedFilter.trim().toLowerCase()))
+              .map(meal => (
+                <div
+                  key={meal.id}
+                  className="bg-[#F5EFE0] border border-[#E3DBC9] rounded-xl overflow-hidden"
+                >
+                  {confirmDeleteId === meal.id ? (
+                    <div className="flex items-center gap-3 px-4 py-3">
+                      <span className="text-sm text-[#A32D2D] flex-1">Delete "{meal.name}"?</span>
+                      <button
+                        onClick={() => handleDeleteSaved(meal.id)}
+                        className="text-sm font-semibold text-[#A32D2D] px-3 py-1 rounded-lg
+                                   bg-[#A32D2D]/10 hover:bg-[#A32D2D]/20 transition-colors"
+                      >
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="text-sm text-[#6B7B8C] hover:text-[#1A2E45] transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3 px-3 py-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-[#1A2E45] truncate">{meal.name}</p>
+                        <p className="text-xs text-[#6B7B8C] mt-0.5">
+                          {meal.calories != null ? `${meal.calories} kcal` : '—'}
+                          {meal.protein_g != null && ` · ${meal.protein_g}g P`}
+                          {meal.carbs_g   != null && ` · ${meal.carbs_g}g C`}
+                          {meal.fat_g     != null && ` · ${meal.fat_g}g F`}
+                        </p>
+                        <p className="text-[10px] text-[#A89F88] mt-0.5">
+                          {meal.use_count > 0
+                            ? `Used ${meal.use_count} time${meal.use_count === 1 ? '' : 's'}`
+                            : 'Not logged yet'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setConfirmDeleteId(meal.id)}
+                        className="p-1.5 text-[#A89F88]/50 hover:text-[#A32D2D]/60
+                                   transition-colors flex-shrink-0"
+                      >
+                        <Trash2 size={14} strokeWidth={1.75} />
+                      </button>
+                      <button
+                        onClick={() => handleLogSaved(meal)}
+                        disabled={savingLog === meal.id}
+                        className="px-3 py-1.5 rounded-xl bg-[#1A2E45] hover:bg-[#152639]
+                                   disabled:opacity-40 text-white text-xs font-semibold
+                                   transition-colors flex-shrink-0"
+                      >
+                        {savingLog === meal.id ? '…' : 'Add'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))
+            }
+          </div>
+        )}
 
         {/* ── Barcode mode body ── */}
         {mode === 'barcode' && (
@@ -1263,7 +1392,8 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
           </form>
         )}
 
-        {/* Fixed footer */}
+        {/* Fixed footer — hidden in "Yours" mode (inline Add buttons used instead) */}
+        {mode !== 'saved' && (
         <div className="px-6 pt-3 pb-6 flex-shrink-0 border-t border-[#E3DBC9]">
           <button
             type="submit"
@@ -1275,6 +1405,8 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
             {saving ? 'Adding…' : 'Add meal'}
           </button>
         </div>
+        )}
+
       </div>
     </div>
   )
@@ -1283,7 +1415,7 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients }) {
 // ─── main page ────────────────────────────────────────────────────────────────
 
 export default function Meals() {
-  const { meals, loading, error, updateMealState, deleteMeal, addMeal, addMealFromIngredients, eaten, planned } = useMeals()
+  const { meals, loading, error, updateMealState, deleteMeal, logSavedMeal, addMeal, addMealFromIngredients, eaten, planned } = useMeals()
   const { target, loading: calLoading } = useCalories()
   const [showModal, setShowModal] = useState(false)
 
@@ -1378,6 +1510,7 @@ export default function Meals() {
           onClose={() => setShowModal(false)}
           onAddMeal={addMeal}
           onAddFromIngredients={addMealFromIngredients}
+          onLogSavedMeal={logSavedMeal}
         />
       )}
     </div>

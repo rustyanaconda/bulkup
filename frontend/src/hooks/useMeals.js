@@ -66,6 +66,20 @@ export function useMeals() {
     return meal
   }
 
+  async function logSavedMeal(mealId) {
+    const res = await authFetch('/meals/log', {
+      method: 'POST',
+      body:   JSON.stringify({ meal_id: mealId }),
+    })
+    if (!res.ok) {
+      const data = await res.json()
+      throw new Error(data.detail || 'Failed to log meal')
+    }
+    const meal = await res.json()
+    setMeals(prev => [...prev, meal])
+    return meal
+  }
+
   async function deleteMeal(logId) {
     setMeals(prev => prev.filter(m => m.id !== logId))
     try {
@@ -79,5 +93,5 @@ export function useMeals() {
   const planned = meals.reduce((sum, m) => m.state === 'upcoming' || m.state === 'missed' ? sum + m.calories : sum, 0)
   const skipped = meals.reduce((sum, m) => m.state === 'skipped'                          ? sum + m.calories : sum, 0)
 
-  return { meals, loading, error, updateMealState, deleteMeal, addMeal, addMealFromIngredients, eaten, planned, skipped }
+  return { meals, loading, error, updateMealState, deleteMeal, logSavedMeal, addMeal, addMealFromIngredients, eaten, planned, skipped }
 }
