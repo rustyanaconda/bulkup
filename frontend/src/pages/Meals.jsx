@@ -75,7 +75,6 @@ function BarcodeScannerView({ onScan, onError }) {
             return { width: w, height: Math.floor(w * 0.6) }
           },
           formatsToSupport: BARCODE_FORMATS,
-          experimentalFeatures: { useBarCodeDetectorIfSupported: true },
         },
         (code) => {
           // Successful decode — safe-stop then hand off the code
