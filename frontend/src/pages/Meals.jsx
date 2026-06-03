@@ -63,10 +63,9 @@ function BarcodeScannerView({ onScan, onError }) {
     scanner
       .start(
         {
-          facingMode:        'environment',
-          width:             { ideal: 1920 },
-          height:            { ideal: 1080 },
-          focusMode:         'continuous',
+          facingMode: 'environment',
+          width:      { ideal: 1920 },
+          height:     { ideal: 1080 },
         },
         {
           fps:              10,
