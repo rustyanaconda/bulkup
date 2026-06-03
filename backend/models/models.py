@@ -62,7 +62,12 @@ meal_tags = Table(
 
 class Meal(Base):
     """
-    A meal template — like a recipe card, reused across days.
+    A reusable meal template. Logging it on a day creates a MealLog that
+    references this row. Calorie/macro values here are the canonical template;
+    the MealLog snapshots them at log time so history is never rewritten.
+
+    TODO: meal_time should move to MealLog so the same Meal can be logged
+    at different times of day. Deferred — keeping it here for now.
     """
     __tablename__ = "meals"
 
@@ -77,6 +82,8 @@ class Meal(Base):
     ingredients = Column(String)   # comma-separated; upgrade to JSON later
     is_smoothie = Column(Integer, default=0)
     is_treat    = Column(Integer, default=0)
+    use_count   = Column(Integer, default=0, nullable=False)
+    last_used   = Column(DateTime, nullable=True)
 
     user             = relationship("User", back_populates="meals")
     logs             = relationship("MealLog", back_populates="meal")
@@ -102,7 +109,12 @@ class MealLog(Base):
     meal_id         = Column(Integer, ForeignKey("meals.id"))
     date            = Column(Date, nullable=False)
     state           = Column(Enum(MealState), default=MealState.upcoming)
-    calories_logged = Column(Integer, nullable=True)  # actual kcal if adjusted
+    # Snapshots set at log time so re-editing the Meal never rewrites history.
+    # calories_logged was the original override field; it now doubles as the snapshot.
+    calories_logged  = Column(Integer, nullable=True)
+    protein_g_logged = Column(Float,   nullable=True)
+    carbs_g_logged   = Column(Float,   nullable=True)
+    fat_g_logged     = Column(Float,   nullable=True)
 
     user = relationship("User", back_populates="meal_logs")
     meal = relationship("Meal", back_populates="logs")

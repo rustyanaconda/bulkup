@@ -4,8 +4,9 @@ Meal plan endpoints.
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Literal
+from sqlalchemy import func
 from sqlalchemy.orm import Session
-from datetime import date
+from datetime import date, datetime
 
 from database import get_db
 from models.models import MealLog, Meal, MealIngredient, MealState, Tag, User
@@ -53,35 +54,88 @@ class MealStateUpdate(BaseModel):
     state:   Literal["done", "skipped", "upcoming"]
 
 
+def _find_meal_by_name(db: Session, user_id: int, name: str) -> Meal | None:
+    """Case-insensitive name match within the user's meals."""
+    return (
+        db.query(Meal)
+        .filter(Meal.user_id == user_id, func.lower(Meal.name) == name.strip().lower())
+        .first()
+    )
+
+
+def _log_meal(db: Session, meal: Meal, user_id: int) -> MealLog:
+    """Create a MealLog with a calorie+macro snapshot from the Meal at this moment."""
+    meal.use_count = (meal.use_count or 0) + 1
+    meal.last_used = datetime.utcnow()
+    log = MealLog(
+        user_id          = user_id,
+        meal_id          = meal.id,
+        date             = date.today(),
+        state            = MealState.upcoming,
+        calories_logged  = meal.calories,
+        protein_g_logged = meal.protein_g,
+        carbs_g_logged   = meal.carbs_g,
+        fat_g_logged     = meal.fat_g,
+    )
+    db.add(log)
+    return log
+
+
+@router.get("/saved")
+def get_saved_meals(
+    user: User    = Depends(get_current_user),
+    db:   Session = Depends(get_db),
+):
+    """Return the user's reusable Meal templates, most-recently-used first."""
+    meals = (
+        db.query(Meal)
+        .filter(Meal.user_id == user.id)
+        .order_by(Meal.last_used.desc().nullslast(), Meal.use_count.desc())
+        .all()
+    )
+    return [
+        {
+            "id":              m.id,
+            "name":            m.name,
+            "calories":        m.calories,
+            "protein_g":       m.protein_g,
+            "carbs_g":         m.carbs_g,
+            "fat_g":           m.fat_g,
+            "meal_time":       m.meal_time,
+            "use_count":       m.use_count,
+            "last_used":       m.last_used.isoformat() if m.last_used else None,
+            "has_ingredients": len(m.ingredients_list) > 0,
+            "tags": [{"id": t.id, "name": t.name, "slug": t.slug,
+                      "tag_type": t.tag_type} for t in m.tags],
+        }
+        for m in meals
+    ]
+
+
 @router.post("", status_code=201)
 def create_meal(
     body: MealCreate,
     user: User    = Depends(get_current_user),
     db:   Session = Depends(get_db),
 ):
-    meal = Meal(
-        user_id=user.id,
-        name=body.name,
-        calories=body.calories,
-        meal_time=body.meal_time,
-        protein_g=body.protein_g,
-        carbs_g=body.carbs_g,
-        fat_g=body.fat_g,
-    )
-    db.add(meal)
-    db.flush()  # assigns meal.id without committing yet
+    meal = _find_meal_by_name(db, user.id, body.name)
 
-    if body.tag_ids:
-        tags = db.query(Tag).filter(Tag.id.in_(body.tag_ids)).all()
-        meal.tags = tags  # silently drops any ids that don't exist
+    if meal is None:
+        meal = Meal(
+            user_id   = user.id,
+            name      = body.name.strip(),
+            calories  = body.calories,
+            meal_time = body.meal_time,
+            protein_g = body.protein_g,
+            carbs_g   = body.carbs_g,
+            fat_g     = body.fat_g,
+        )
+        db.add(meal)
+        db.flush()  # assigns meal.id
+        if body.tag_ids:
+            meal.tags = db.query(Tag).filter(Tag.id.in_(body.tag_ids)).all()
 
-    log = MealLog(
-        user_id=user.id,
-        meal_id=meal.id,
-        date=date.today(),
-        state=MealState.upcoming,
-    )
-    db.add(log)
+    log = _log_meal(db, meal, user.id)
     db.commit()
     db.refresh(log)
     db.refresh(meal)
@@ -89,7 +143,7 @@ def create_meal(
     return {
         "id":        log.id,
         "name":      meal.name,
-        "calories":  meal.calories,
+        "calories":  log.calories_logged,
         "meal_time": meal.meal_time,
         "state":     log.state.value,
         "tags":      [{"id": t.id, "name": t.name, "slug": t.slug, "tag_type": t.tag_type} for t in meal.tags],
@@ -171,35 +225,31 @@ def create_meal_from_ingredients(
             "fat_g":       fat  if p.fat_g     is not None else None,
         })
 
-    # ── 2. Create Meal with summed nutrition ──────────────────────────────
-    meal = Meal(
-        user_id   = user.id,
-        name      = body.name,
-        meal_time = body.meal_time,
-        calories  = round(total["calories"]),
-        protein_g = round(total["protein_g"], 1),
-        carbs_g   = round(total["carbs_g"],   1),
-        fat_g     = round(total["fat_g"],     1),
-    )
-    db.add(meal)
-    db.flush()  # assigns meal.id
+    # ── 2. Find or create the Meal template ──────────────────────────────
+    meal = _find_meal_by_name(db, user.id, body.name)
 
-    if body.tag_ids:
-        tags = db.query(Tag).filter(Tag.id.in_(body.tag_ids)).all()
-        meal.tags = tags
+    if meal is None:
+        meal = Meal(
+            user_id   = user.id,
+            name      = body.name.strip(),
+            meal_time = body.meal_time,
+            calories  = round(total["calories"]),
+            protein_g = round(total["protein_g"], 1),
+            carbs_g   = round(total["carbs_g"],   1),
+            fat_g     = round(total["fat_g"],     1),
+        )
+        db.add(meal)
+        db.flush()  # assigns meal.id
 
-    # ── 3. Create MealIngredient rows ─────────────────────────────────────
-    for row in ing_rows:
-        db.add(MealIngredient(meal_id=meal.id, **row))
+        if body.tag_ids:
+            meal.tags = db.query(Tag).filter(Tag.id.in_(body.tag_ids)).all()
 
-    # ── 4. Create today's MealLog ─────────────────────────────────────────
-    log = MealLog(
-        user_id = user.id,
-        meal_id = meal.id,
-        date    = date.today(),
-        state   = MealState.upcoming,
-    )
-    db.add(log)
+        # ── 3. Create MealIngredient rows (new meal only — never overwrite) ──
+        for row in ing_rows:
+            db.add(MealIngredient(meal_id=meal.id, **row))
+
+    # ── 4. Create today's MealLog with snapshot ───────────────────────────
+    log = _log_meal(db, meal, user.id)
     db.commit()
     db.refresh(log)
     db.refresh(meal)
@@ -238,18 +288,10 @@ def delete_meal(
     if log is None:
         raise HTTPException(status_code=404, detail="Meal not found")
 
-    meal_id = log.meal_id
-
-    # Remove the log entry first (FK references meal)
+    # Delete only the log — the Meal template is retained for reuse.
+    # Orphaned Meals (no remaining logs) stay in the saved list until
+    # explicitly deleted via a future "remove saved meal" endpoint.
     db.delete(log)
-    db.flush()
-
-    # Remove the meal itself; cascade="all, delete-orphan" on ingredients_list
-    # propagates the delete to MealIngredient rows automatically
-    meal = db.query(Meal).filter(Meal.id == meal_id).first()
-    if meal:
-        db.delete(meal)
-
     db.commit()
     return {"deleted": True, "id": log_id}
 
