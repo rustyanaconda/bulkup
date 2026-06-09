@@ -6,15 +6,36 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
+from datetime import datetime
+
 from database import get_db
-from models.models import Food, FoodPortion, User
+from models.models import Food, FoodPortion, BarcodeQueue, User
 from routers.auth import get_current_user
 
 router = APIRouter()
 
-USDA_SEARCH_URL  = "https://api.nal.usda.gov/fdc/v1/foods/search"
-USDA_DETAIL_URL  = "https://api.nal.usda.gov/fdc/v1/food/{fdc_id}"
+USDA_SEARCH_URL   = "https://api.nal.usda.gov/fdc/v1/foods/search"
+USDA_DETAIL_URL   = "https://api.nal.usda.gov/fdc/v1/food/{fdc_id}"
 EDAMAM_PARSER_URL = "https://api.edamam.com/api/food-database/v2/parser"
+OFF_PRODUCT_URL   = "https://world.openfoodfacts.org/api/v2/product/{barcode}.json"
+
+# Open Food Facts nutriments per 100g → (Food column, multiplier)
+# All _100g values are in grams; minerals/vitamins are converted to mg via ×1000.
+OFF_NUTRIENT_MAP = {
+    "energy-kcal_100g":   ("calories",        1),
+    "proteins_100g":      ("protein_g",       1),
+    "carbohydrates_100g": ("carbs_g",         1),
+    "fat_100g":           ("fat_g",           1),
+    "fiber_100g":         ("fiber_g",         1),
+    "sugars_100g":        ("sugar_g",         1),
+    "saturated-fat_100g": ("saturated_fat_g", 1),
+    "sodium_100g":        ("sodium_mg",       1000),   # g → mg
+    "potassium_100g":     ("potassium_mg",    1000),   # g → mg
+    "calcium_100g":       ("calcium_mg",      1000),   # g → mg
+    "iron_100g":          ("iron_mg",         1000),   # g → mg
+    "cholesterol_100g":   ("cholesterol_mg",  1000),   # g → mg
+    "vitamin-c_100g":     ("vitamin_c_mg",    1000),   # g → mg
+}
 
 NUTRIENT_FIELDS = {
     "208": "calories",
@@ -228,85 +249,119 @@ def get_curated_food(
     return _food_detail_dict(food)
 
 
+@router.get("/barcode-queue")
+def get_barcode_queue(
+    _user: User    = Depends(get_current_user),
+    db:    Session = Depends(get_db),
+):
+    """Unresolved barcodes queued for manual research, most-scanned first."""
+    rows = (
+        db.query(BarcodeQueue)
+        .filter(BarcodeQueue.resolved == False)  # noqa: E712
+        .order_by(BarcodeQueue.times_scanned.desc())
+        .all()
+    )
+    return [
+        {
+            "id":               r.id,
+            "barcode":          r.barcode,
+            "times_scanned":    r.times_scanned,
+            "first_scanned_at": r.first_scanned_at.isoformat(),
+            "last_scanned_at":  r.last_scanned_at.isoformat(),
+        }
+        for r in rows
+    ]
+
+
+def _upsert_barcode_queue(db: Session, barcode: str) -> None:
+    """Add barcode to research queue, or increment its scan count if already there."""
+    now = datetime.utcnow()
+    existing = db.query(BarcodeQueue).filter(BarcodeQueue.barcode == barcode).first()
+    if existing:
+        existing.times_scanned   += 1
+        existing.last_scanned_at  = now
+    else:
+        db.add(BarcodeQueue(
+            barcode          = barcode,
+            first_scanned_at = now,
+            last_scanned_at  = now,
+        ))
+    db.commit()
+
+
 @router.get("/barcode/{barcode}")
 async def get_food_by_barcode(
     barcode: str,
     _user:   User    = Depends(get_current_user),
     db:      Session = Depends(get_db),
 ):
-    # ── 1. DB fast path: return immediately if we've seen this barcode before ──
+    # ── 1. DB fast path ───────────────────────────────────────────────────────
     existing = db.query(Food).filter(Food.barcode == barcode).first()
     if existing:
         return _food_detail_dict(existing)
 
-    # ── 2. Edamam lookup ──────────────────────────────────────────────────────
-    app_id  = os.getenv("EDAMAM_APP_ID")
-    app_key = os.getenv("EDAMAM_APP_KEY")
-    if not app_id or not app_key:
-        raise HTTPException(status_code=503, detail="Product database not configured")
-
+    # ── 2. Open Food Facts lookup ─────────────────────────────────────────────
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.get(
-                EDAMAM_PARSER_URL,
-                params={"upc": barcode, "app_id": app_id, "app_key": app_key},
+                OFF_PRODUCT_URL.format(barcode=barcode),
+                headers={"User-Agent": "Mise-App/1.0 (mise.fit)"},
                 timeout=10,
             )
-    except httpx.RequestError as exc:
-        raise HTTPException(status_code=502, detail=f"Could not reach product database: {exc}")
+    except httpx.RequestError:
+        _upsert_barcode_queue(db, barcode)
+        return {"queued": True, "barcode": barcode}
 
     if resp.status_code != 200:
-        raise HTTPException(status_code=502, detail=f"Product database error {resp.status_code}")
+        _upsert_barcode_queue(db, barcode)
+        return {"queued": True, "barcode": barcode}
 
-    hints = resp.json().get("hints", [])
-    if not hints:
-        raise HTTPException(status_code=404, detail="Product not found for this barcode.")
+    body    = resp.json()
+    product = body.get("product") or {}
+    status  = body.get("status")  # 0 = not found, 1 = found
 
-    hint       = hints[0]
-    edamam_food = hint.get("food", {})
-    nutrients  = edamam_food.get("nutrients", {})
+    # Treat as a miss if OFF says not found or calories are absent (data unusable)
+    nutriments = product.get("nutriments") or {}
+    if status != 1 or nutriments.get("energy-kcal_100g") is None:
+        _upsert_barcode_queue(db, barcode)
+        return {"queued": True, "barcode": barcode}
 
     # ── 3. Normalize into a Food row ─────────────────────────────────────────
+    name = (
+        product.get("product_name_en")
+        or product.get("product_name")
+        or product.get("abbreviated_product_name")
+        or "Unknown product"
+    ).strip() or "Unknown product"
+
     food = Food(
-        name     = edamam_food.get("label", "Unknown product"),
+        name     = name,
         category = "branded",
-        source   = "edamam",
+        source   = "openfoodfacts",
         barcode  = barcode,
         fdc_id   = None,
     )
-    for edamam_key, col in EDAMAM_NUTRIENT_MAP.items():
-        setattr(food, col, nutrients.get(edamam_key))
+    for off_key, (col, mult) in OFF_NUTRIENT_MAP.items():
+        val = nutriments.get(off_key)
+        setattr(food, col, round(val * mult, 2) if val is not None else None)
 
     db.add(food)
-    db.flush()  # assigns food.id before adding portions
+    db.flush()
 
-    # ── 4. Build portions ─────────────────────────────────────────────────────
-    serving_grams = None
-    for measure in hint.get("measures", []):
-        if measure.get("label", "").lower() == "serving" and measure.get("weight"):
-            serving_grams = measure["weight"]
-            break
-    # Fall back to servingSizes on the food object if measures had nothing useful
-    if serving_grams is None:
-        for sv in edamam_food.get("servingSizes", []):
-            if sv.get("quantity"):
-                serving_grams = sv["quantity"]
-                break
-
+    # ── 4. Portions: prefer serving_quantity (numeric grams), fall back to none ─
+    serving_grams = product.get("serving_quantity")  # already a float in grams
     if serving_grams:
         db.add(FoodPortion(food_id=food.id, label="1 serving",
-                           grams=serving_grams, is_default=1))
+                           grams=float(serving_grams), is_default=1))
         db.add(FoodPortion(food_id=food.id, label="grams",
                            grams=1, is_default=0))
     else:
         db.add(FoodPortion(food_id=food.id, label="grams",
                            grams=1, is_default=1))
 
-    # ── 5. Persist ────────────────────────────────────────────────────────────
+    # ── 5. Persist and return ─────────────────────────────────────────────────
     db.commit()
     db.refresh(food)
-
-    # ── 6. Return in curated detail shape ────────────────────────────────────
     return _food_detail_dict(food)
 
 

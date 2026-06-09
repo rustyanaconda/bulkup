@@ -451,6 +451,7 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients, onLogSavedMeal
   const [barcodeInput,   setBarcodeInput]   = useState('')
   const [barcodeLoading, setBarcodeLoading] = useState(false)
   const [barcodeError,   setBarcodeError]   = useState(null)
+  const [barcodeQueued,  setBarcodeQueued]  = useState(false)  // true when barcode was sent to research queue
   const [scannerActive,  setScannerActive]  = useState(false)
   const [cameraError,    setCameraError]    = useState(null)
 
@@ -544,18 +545,19 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients, onLogSavedMeal
     if (!code) return
     setBarcodeLoading(true)
     setBarcodeError(null)
+    setBarcodeQueued(false)
     setPendingFood(null)
     try {
       const res = await authFetch(`/foods/barcode/${encodeURIComponent(code)}`)
-      if (res.status === 404) {
-        setBarcodeError('No product found for that barcode.')
-        return
-      }
       if (!res.ok) {
         setBarcodeError('Something went wrong. Please try again.')
         return
       }
       const food = await res.json()
+      if (food.queued) {
+        setBarcodeQueued(true)
+        return
+      }
       const defaultIdx = (food.portions ?? []).findIndex(p => p.is_default)
       setPendingFood(food)
       setPendingQty('1')
@@ -718,6 +720,7 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients, onLogSavedMeal
                   setCameraError(null)
                   setCalManual(false)
                   setConfirmDeleteId(null)
+                  setBarcodeQueued(false)
                 }}
                 className={`flex-1 py-1.5 rounded-[10px] transition-colors flex flex-col items-center gap-0.5
                             ${mode === m
@@ -968,6 +971,29 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients, onLogSavedMeal
                   </div>
                 </div>
 
+                {barcodeQueued && (
+                  <div className="bg-[#F5EFE0] border border-[#E3DBC9] rounded-xl px-4 py-3 space-y-2">
+                    <p className="text-sm font-semibold text-[#1A2E45]">
+                      We don't have this product yet — we've noted it.
+                    </p>
+                    <p className="text-xs text-[#6B7B8C]">
+                      It'll be added to our research list. In the meantime, enter it manually.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode('manual')
+                        setBarcodeQueued(false)
+                        setScannerActive(false)
+                      }}
+                      className="text-xs font-semibold text-[#1A2E45] underline underline-offset-2
+                                 hover:text-[#152639] transition-colors"
+                    >
+                      Add it manually →
+                    </button>
+                  </div>
+                )}
+
                 {barcodeError && (
                   <p className="text-sm text-[#A32D2D] bg-[#A32D2D]/10 rounded-xl px-3 py-2">
                     {barcodeError}
@@ -1031,6 +1057,13 @@ function AddMealModal({ onClose, onAddMeal, onAddFromIngredients, onLogSavedMeal
                     <p className="text-xs text-[#6B7B8C]">≈ {Math.round(grams)}g · {cals} kcal</p>
                   ) : null
                 })()}
+
+                {pendingFood.source === 'openfoodfacts' && (
+                  <p className="text-[10px] text-[#A89F88]">
+                    Data: <a href="https://openfoodfacts.org" target="_blank" rel="noreferrer"
+                      className="underline">Open Food Facts</a> (CC BY-SA)
+                  </p>
+                )}
 
                 <button
                   type="button"

@@ -13,7 +13,7 @@ SQL equivalent of User:
         ...
     );
 """
-from sqlalchemy import Column, Integer, String, Float, Date, Enum, ForeignKey, DateTime, Table, text
+from sqlalchemy import Column, Integer, String, Float, Date, Enum, ForeignKey, DateTime, Table, text, Boolean
 from sqlalchemy.orm import declarative_base, relationship
 from datetime import datetime
 import enum
@@ -231,6 +231,18 @@ class BurnSnapshot(Base):
     date        = Column(Date,     nullable=False)
     recorded_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     burned_kcal = Column(Integer,  nullable=True)
+
+
+class BarcodeQueue(Base):
+    """Barcodes not found in our foods table or Open Food Facts — queued for manual research."""
+    __tablename__ = "barcode_queue"
+
+    id                = Column(Integer,  primary_key=True, index=True)
+    barcode           = Column(String,   nullable=False, unique=True, index=True)
+    times_scanned     = Column(Integer,  nullable=False, default=1)
+    first_scanned_at  = Column(DateTime, nullable=False, default=datetime.utcnow)
+    last_scanned_at   = Column(DateTime, nullable=False, default=datetime.utcnow)
+    resolved          = Column(Boolean,  nullable=False, default=False)
 
 
 class WaitlistSignup(Base):
